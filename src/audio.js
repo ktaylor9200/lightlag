@@ -1,8 +1,9 @@
 // LIGHT LAG — WebAudio synth. Everything here has a visual twin; failure is silent.
 const AU = (() => {
-  let ctx = null, master = null, on = true, wind = null;
+  let ctx = null, master = null, on = true, wind = null, unlocked = false;
   function init() {
-    if (ctx || !on) return;
+    // no AudioContext until the player has tapped something
+    if (ctx || !on || !unlocked) return;
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
@@ -34,11 +35,14 @@ const AU = (() => {
   const api = {
     get on() { return on; },
     set on(v) { on = v; if (!v) api.stopWind(); if (v) init(); },
-    init() { init(); resume(); },
-    thoom() { tone(70, 0.6, 'sine', 0.5, 0, 45); tone(140, 0.25, 'triangle', 0.08); },
-    tick() { tone(1800, 0.05, 'square', 0.04); },
+    // called from tap handlers only
+    init() { unlocked = true; init(); resume(); },
+    thoom() { tone(70, 0.6, 'sine', 0.5, 0, 45); tone(140, 0.25, 'triangle', 0.08); tone(880, 0.35, 'sine', 0.015, 0.02, 660); },
+    tick() { tone(1500, 0.045, 'triangle', 0.05); },
     chime() { tone(2600 + Math.random() * 400, 0.5, 'sine', 0.035); },
     step() { tone(420, 0.08, 'sine', 0.05); },
+    tag() { tone(784, 0.25, 'triangle', 0.06); tone(1175, 0.4, 'sine', 0.045, 0.07); },
+    wake() { tone(523, 0.9, 'sine', 0.07); tone(659, 0.9, 'sine', 0.05, 0.05); tone(1046, 0.7, 'sine', 0.025, 0.1); },
     chord() { tone(392, 1.6, 'sine', 0.14); tone(587, 1.8, 'sine', 0.1, 0.14); tone(784, 1.6, 'sine', 0.04, 0.28); },
     sign() { tone(660, 0.4, 'triangle', 0.08); tone(990, 0.5, 'sine', 0.05, 0.08); },
     object() { tone(180, 0.5, 'sawtooth', 0.05, 0, 120); },
