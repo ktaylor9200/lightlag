@@ -1,0 +1,41 @@
+======================================================================
+1 As It Was
+  projection for D1 unlocks at Home year 2
+  projection for D2 unlocks at Home year 14
+  naive: aim at what you see           -> None
+  naive, then corrected at y2          -> {'confirmed_at_home': 9, 'happened_at': 7, 'lag': 2}
+  reference: wait for projection       -> {'confirmed_at_home': 11, 'happened_at': 9, 'lag': 2}
+  second chance only (D2)              -> {'confirmed_at_home': 25, 'happened_at': 23, 'lag': 2}
+======================================================================
+2 Closer Than It Looks
+  projection for D1 unlocks at Home year 6
+  projection for D2 unlocks at Home year 1
+  naive: aim at what you see (y5)      -> None  | hidden-mirror glints seen at [13]
+  reference                            -> {'confirmed_at_home': 16, 'happened_at': 12, 'lag': 4}  | hidden-mirror glints seen at [14, 15]
+======================================================================
+3 Chorus
+  naive: flash both now                -> None  | hidden-mirror glints seen at [6, 14]
+  reference                            -> {'confirmed_at_home': 10, 'happened_at': 7, 'lag': 3}  | hidden-mirror glints seen at [6, 8, 14]
+======================================================================
+4 Filed Noise
+  projection for D unlocks at Home year 5
+  naive: flash all at y5               -> None  | hidden-mirror glints seen at [11, 13, 14, 15, 16, 17]
+  reference (sends after projection)   -> {'confirmed_at_home': 14, 'happened_at': 13, 'lag': 1}  | hidden-mirror glints seen at [11, 12, 13, 14, 15, 16]
+======================================================================
+5 Standing
+  naive: ask both at once              -> None
+  wrong order                          -> None
+  reference                            -> {'confirmed_at_home': 7, 'happened_at': 4, 'lag': 3}
+======================================================================
+6 No Universal Now
+  naive: both drones now               -> None
+  Home asks both, P first              -> None
+  Home asks both, Q first              -> None
+  one drone does both                  -> None
+  reference                            -> {'confirmed_at_home': 8, 'happened_at': 5, 'lag': 3}
+  alt: drone + Home                    -> {'confirmed_at_home': 9, 'happened_at': 6, 'lag': 3}
+======================================================================
+7 The Knot
+  naive: all three now                 -> None
+  solve P,Q,R but miss the split       -> None
+  reference                            -> {'confirmed_at_home': 15, 'happened_at': 12, 'lag': 3}

@@ -1,0 +1,99 @@
+{
+  "_comment": "LIGHT LAG level data. Axial hex coords [q, r], pointy-top, r grows downward. Home is always [0,0]. Tick = 1 year; light = 1 hex/tick; drones = 1 hex per 2 ticks. Derelicts: position at tick 0, direction, period (ticks per hex) and 'first' (tick of first step); derelicts that start on the board use 1 <= first <= period so their pre-tick-0 history is regular. test_plans are for QA: each is a list of [tick, kind, who, arg].",
+  "levels": [
+    {
+      "n": 1, "act": 1, "name": "As It Was", "R": 4,
+      "drones": {"A": [-1, 1]},
+      "derelicts": [
+        {"id": "D1", "pos": [2, -3], "dir": "SE", "period": 3, "first": 2},
+        {"id": "D2", "pos": [-4, 5], "dir": "NE", "period": 3, "first": 8}
+      ],
+      "objective": {"type": "tag_any", "text": "Tag a derelict."},
+      "test_plans": {
+        "naive: aim at what you see": [[0, "MOVE", "A", [2, -4]]],
+        "naive, then corrected at y2": [[0, "MOVE", "A", [2, -4]], [2, "MOVE", "A", [2, -1]]],
+        "reference: wait for projection": [[2, "MOVE", "A", [2, 0]]],
+        "second chance only (D2)": [[0, "MOVE", "A", [2, -4]], [12, "MOVE", "A", [2, -1]]]
+      }
+    },
+    {
+      "n": 2, "act": 1, "name": "Closer Than It Looks", "R": 4,
+      "drones": {"A": [-1, 0], "B": [-2, 4]},
+      "derelicts": [
+        {"id": "D1", "pos": [1, -4], "dir": "SE", "period": 3, "first": 3},
+        {"id": "D2", "pos": [1, 0], "dir": "SW", "period": 3, "first": 3}
+      ],
+      "watchers": [{"id": "m0", "pos": [-3, -1], "kind": "mirror", "hidden": true}],
+      "objective": {"type": "tag", "ids": ["D1", "D2"], "text": "Tag both derelicts."},
+      "test_plans": {
+        "naive: aim at what you see (y5)": [[5, "MOVE", "A", [1, -3]], [5, "MOVE", "B", [-1, 2]]],
+        "reference": [[6, "MOVE", "B", [-3, 4]], [7, "MOVE", "A", [1, 0]]]
+      }
+    },
+    {
+      "n": 3, "act": 1, "name": "Chorus", "R": 4,
+      "drones": {"A": [-1, 0], "B": [2, 2]},
+      "receivers": [{"id": "X", "cell": [3, -1], "need": 2}],
+      "watchers": [{"id": "m1", "pos": [-2, -1], "kind": "mirror", "hidden": true}],
+      "objective": {"type": "rec", "id": "X", "text": "Wake the old relay: two signals must reach it in the same year."},
+      "test_plans": {
+        "naive: flash both now": [[0, "FLASH", "A", null], [0, "FLASH", "B", null]],
+        "reference": [[0, "FLASH", "B", null], [2, "FLASH", "A", null]]
+      }
+    },
+    {
+      "n": 4, "act": 1, "name": "Filed Noise", "R": 4,
+      "drones": {"A": [0, -2], "B": [-2, 3], "C": [3, 1]},
+      "derelicts": [{"id": "D", "pos": [-3, -1], "dir": "E", "period": 3, "first": 2}],
+      "receivers": [{"id": "X", "ride": "D", "need": 3}],
+      "watchers": [{"id": "m2", "pos": [-3, 0], "kind": "mirror", "hidden": true},
+                   {"id": "m3", "pos": [2, 2], "kind": "mirror", "hidden": true}],
+      "objective": {"type": "rec", "id": "X", "text": "A relay rides this derelict. Three signals, one year."},
+      "test_plans": {
+        "naive: flash all at y5": [[5, "FLASH", "A", null], [5, "FLASH", "B", null], [5, "FLASH", "C", null]],
+        "reference (sends after projection)": [[5, "FLASH", "C", null], [6, "FLASH", "B", null], [9, "FLASH", "A", null]]
+      }
+    },
+    {
+      "n": 5, "act": 2, "name": "Standing", "R": 4,
+      "drones": {},
+      "watchers": [{"id": "P", "pos": [3, -3], "kind": "precedent"}, {"id": "S", "pos": [-3, 1], "kind": "sign"}],
+      "objective": {"type": "sign", "text": "Ask both watchers. Collect both signatures."},
+      "test_plans": {
+        "naive: ask both at once": [[0, "PING", "HOME", "P"], [0, "PING", "HOME", "S"]],
+        "wrong order": [[0, "PING", "HOME", "S"], [1, "PING", "HOME", "P"]],
+        "reference": [[0, "PING", "HOME", "P"], [1, "PING", "HOME", "S"]]
+      }
+    },
+    {
+      "n": 6, "act": 2, "name": "No Universal Now", "R": 4,
+      "drones": {"X": [4, -4], "Y": [0, -1]},
+      "watchers": [{"id": "P", "pos": [3, -3], "kind": "precedent"}, {"id": "Q", "pos": [0, -3], "kind": "precedent"}],
+      "objective": {"type": "sign", "text": "Each insists on being asked first. Satisfy both."},
+      "test_plans": {
+        "naive: both drones now": [[0, "FLASH", "X", "P"], [0, "FLASH", "Y", "Q"]],
+        "Home asks both, P first": [[0, "PING", "HOME", "P"], [1, "PING", "HOME", "Q"]],
+        "Home asks both, Q first": [[0, "PING", "HOME", "Q"], [1, "PING", "HOME", "P"]],
+        "one drone does both": [[0, "FLASH", "X", "P"], [0, "MOVE", "X", [1, -3]], [9, "FLASH", "X", "Q"]],
+        "reference": [[0, "FLASH", "X", "P"], [2, "FLASH", "Y", "Q"]],
+        "alt: drone + Home": [[0, "FLASH", "X", "P"], [3, "PING", "HOME", "Q"]]
+      }
+    },
+    {
+      "n": 7, "act": 2, "name": "The Knot", "R": 4,
+      "drones": {"X": [2, -4], "Y": [0, -1], "Z": [4, -1]},
+      "watchers": [
+        {"id": "P", "pos": [2, -3], "kind": "precedent"},
+        {"id": "Q", "pos": [0, -2], "kind": "precedent"},
+        {"id": "R", "pos": [3, -1], "kind": "precedent",
+         "split": {"tick": 6, "id": "R2", "pos": [3, 0], "kind": "sign"}}
+      ],
+      "objective": {"type": "sign", "text": "Three precedents. Every party must sign."},
+      "test_plans": {
+        "naive: all three now": [[0, "FLASH", "X", "P"], [0, "FLASH", "Y", "Q"], [0, "FLASH", "Z", "R"]],
+        "solve P,Q,R but miss the split": [[0, "FLASH", "X", "P"], [3, "FLASH", "Y", "Q"], [0, "FLASH", "Z", "R"]],
+        "reference": [[0, "FLASH", "X", "P"], [3, "FLASH", "Y", "Q"], [0, "FLASH", "Z", "R"], [9, "PING", "HOME", "R2"]]
+      }
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>LIGHT LAG</title>
+<style>
+/*CSS*/
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <button id="lvlname" class="ghost" aria-label="Level"></button>
+    <div id="year" aria-live="polite">YEAR <b>0</b></div>
+    <button id="menuBtn" class="iconbtn" aria-label="Menu">&#9776;</button>
+  </header>
+  <button id="obj" class="ghost"></button>
+  <div id="boardwrap">
+    <canvas id="board" aria-label="Board"></canvas>
+    <div id="coach" class="hidden"></div>
+    <div id="toast" class="hidden"></div>
+  </div>
+  <div id="dock">
+    <button id="log" class="ghost"><span class="sym">&#8961;</span><span id="logtext"></span><span id="logact"></span></button>
+    <div id="outbox"></div>
+    <div id="chips"></div>
+    <div id="primaryRow">
+      <button id="primary" class="primary">WAIT &#9656;</button>
+      <button id="ff" class="secondary" aria-label="Until news">&#9656;&#9656;</button>
+    </div>
+  </div>
+</div>
+<div id="sheetBack" class="hidden"></div>
+<div id="sheet" class="hidden" role="dialog"><div id="sheetGrip"></div><div id="sheetBody"></div></div>
+<div id="overlay" class="hidden"></div>
+<script>
+/*JS*/
+</script>
+</body>
+</html>
