@@ -35,15 +35,33 @@ const layoutCheck = `(() => {
   for (const [w, h] of [[360, 640], [390, 844], [360, 560]]) {
     const B = await launch({ w, h });
     await B.goto(url);
+    const shots = w === 390 || h === 640;
+    const S = async (name) => { if (shots) await B.shot(path.join(out, (w === 390 ? '' : `${w}x${h}-`) + name + '.png')); };
+    // L1 tutorial: the coach must never cover the drone or the derelict it points at
+    const tapHex = (q, r) => B.eval(`(() => { const p = __LL.geomOf().px(${q}, ${r}); __LL.onBoardTap(p[0], p[1]); return __LL.G.tut; })()`);
+    const coachClear = `(() => { const c = document.getElementById('coach'); if (c.classList.contains('hidden')) return true; const cr = c.getBoundingClientRect(), br = document.getElementById('board').getBoundingClientRect(), g = __LL.geomOf();
+      return [[-1, 1], [2, -4]].every(([q, r]) => { const p = g.px(q, r), x = br.left + p[0], y = br.top + p[1]; return y + g.size < cr.top || y - g.size > cr.bottom || x + g.size < cr.left || x - g.size > cr.right; }); })()`;
+    await B.eval(`(() => { const L = __LL; L.G.save.tutorialDone = false; L.hideOverlay(); L.loadLevel(1); return 1; })()`);
+    await B.sleep(300); await S('L1-tut-0');
+    ok(await B.eval(coachClear), `${w}x${h} tutorial coach clear of A and D1 (step 0)`);
+    await tapHex(-1, 1); await B.sleep(300); await S('L1-tut-1');
+    ok(await B.eval(coachClear), `${w}x${h} tutorial coach clear of A and D1 (step 1)`);
+    await tapHex(2, -4); await B.sleep(300); await S('L1-tut-2');
+    ok(await B.eval(coachClear), `${w}x${h} tutorial coach clear of A and D1 (step 2)`);
+    await B.eval(`__LL.advance(); __LL.advance(); 1`); await B.sleep(500); await S('L1-tut-y2');
     await B.eval(`__LL.G.save.tutorialDone = true; 1`);
-    const shots = w === 390;
-    const S = async (name) => { if (shots) await B.shot(path.join(out, name + '.png')); };
     // L2 mid, drone selected with queued order
     await B.eval(playTo(2, 'reference', 6));
     await B.eval(`__LL.select('B'); __LL.queueMove('B', [-3, 4]); 1`);
     let lc = await B.eval(layoutCheck);
     ok(!lc.bad.length, `${w}x${h} L2 layout board=${lc.board} ${lc.bad.join('; ')}`);
     await S('L2-y6-selected');
+    // inspector and menu sheets
+    await B.eval(`(() => { __LL.G.sel = null; const g = __LL.geomOf(); const p = g.px(1, -2); __LL.onBoardTap(p[0], p[1]); return 1; })()`);
+    await B.sleep(350); await S('sheet-inspect');
+    await B.eval(`document.getElementById('sheetBack').click(); document.getElementById('menuBtn').click(); 1`);
+    await B.sleep(350); await S('sheet-menu');
+    await B.eval(`document.getElementById('sheetBack').click(); 1`);
     await B.eval(playTo(3, 'reference', 2)); await B.eval(`__LL.select('A'); 1`); await S('L3-y2-tags');
     await B.eval(playTo(4, 'reference (sends after projection)', 9)); await B.eval(`__LL.select('A'); 1`); await S('L4-y9');
     lc = await B.eval(layoutCheck); ok(!lc.bad.length, `${w}x${h} L4 layout ${lc.bad.join('; ')}`);
@@ -53,16 +71,20 @@ const layoutCheck = `(() => {
     // finale yr 13 with V selected
     await B.eval(`(() => { const L = __LL; L.hideOverlay(); L.loadLevel(8); for (let i = 0; i < 3; i++) document.getElementById('primary').click(); while (L.G.now < 13) { L.advance(); L.G.p = 1; } L.select('V'); return 1; })()`);
     lc = await B.eval(layoutCheck); ok(!lc.bad.length, `${w}x${h} finale layout ${lc.bad.join('; ')}`);
+    if (shots) await B.sleep(400); // let the button colour transition settle
     await S('L8-y13');
     // win -> act card -> interstitial -> L5 by real taps
     await B.eval(playTo(4, 'reference (sends after projection)', 13));
     await B.eval(`__LL.advance(); __LL.G.p = 1; __LL.G.won`);
-    await B.sleep(1900);
+    await B.sleep(500);
+    await S('confirm-L4');
+    await B.sleep(2600);
     await S('win-L4');
     lc = await B.eval(`(() => { const r = document.querySelector('.win').getBoundingClientRect(); const n = document.getElementById('wNext').getBoundingClientRect(); return [Math.round(r.height), Math.round(n.bottom), innerHeight]; })()`);
     ok(lc[1] <= lc[2], `${w}x${h} win screen Next button visible (bottom ${lc[1]} / vh ${lc[2]})`);
     await B.eval(`document.getElementById('wNext').click(); 1`);
     for (let i = 0; i < 4; i++) { await B.tap(w / 2, 100); }
+    if (shots) await B.sleep(2400); // let the first board play long enough for a glint to resolve
     await S('interstitial-1');
     for (let i = 0; i < 5; i++) await B.tap(w / 2, 100);
     await B.sleep(200);
@@ -71,14 +93,16 @@ const layoutCheck = `(() => {
     await S('L5-intro');
     // ending sequence to credits
     await B.eval(`(() => { const L = __LL; L.hideOverlay(); L.loadLevel(8); for (let i = 0; i < 3; i++) document.getElementById('primary').click(); while (!L.G.won) { if (L.G.now === 10) L.G.queue.push({kind:'PING', who:'HOME', arg:'W'}); L.advance(); L.G.p = 1; } return L.G.now; })()`);
-    await B.sleep(2500); await S('end-1-stamp');
+    await B.sleep(4000); await S('end-1-stamp');
     for (let i = 0; i < 3; i++) await B.tap(w / 2, 60);
     await S('end-2-forest');
     for (let i = 0; i < 3; i++) await B.tap(w / 2, 60);
     await B.sleep(3000); await S('end-3-replay');
     await B.eval(`document.getElementById('eNext').click(); 1`);
+    if (shots) await B.sleep(3200);
     await S('end-4-credits');
     ok(await B.eval(`!!document.getElementById('cPlay')`), `${w}x${h} ending reaches credits`);
+    await B.eval(`document.getElementById('cPlay').click(); 1`); await B.sleep(400); await S('levels');
     ok(!B.logs.some((l) => l.startsWith('EXCEPTION') || l.startsWith('error')), `${w}x${h} no console errors ${B.logs.filter((l) => l.startsWith('EXC')).slice(0, 2).join(' | ')}`);
     await B.close();
   }

@@ -34,8 +34,22 @@ const url = 'file://' + path.join(__dirname, '..', 'lightlag.html');
   // empty hex toast
   await B.eval(`(() => { const g = __LL.geomOf(); const p = g.px(-2, 0); __LL.onBoardTap(p[0], p[1]); return 1; })()`);
   ok(/Ring 2/.test(await B.eval(`document.getElementById('toast').textContent`)), 'empty hex toast');
+  // reduced motion: a year changes instantly, and frames keep rendering
+  await B.eval(`(() => { const L = __LL; L.G.save.settings.reduced = true; L.loadLevel(2); L.advance(); return 1; })()`);
+  await B.sleep(300);
+  ok(await B.eval(`__LL.G.p === 1`), 'reduced motion: no year transition');
+  await B.eval(`__LL.G.save.settings.reduced = false; 1`);
   ok(!B.logs.some((l) => l.startsWith('EXCEPTION')), 'no exceptions ' + B.logs.filter((l) => l.startsWith('EXC')).join(' | '));
   await B.close();
+  // sound: no AudioContext until the first tap
+  const B2 = await launch({ w: 390, h: 844 });
+  await B2.send('Page.addScriptToEvaluateOnNewDocument', { source: `window.__ac = 0; const AC0 = window.AudioContext; window.AudioContext = class extends AC0 { constructor(...a) { super(...a); window.__ac++; } };` });
+  await B2.goto(url);
+  await B2.eval(`(() => { const L = __LL; L.G.save.tutorialDone = true; L.hideOverlay(); L.loadLevel(3); L.queueFlash('A', null); L.advance(); L.advance(); return 1; })()`);
+  ok(await B2.eval('window.__ac') === 0, 'no audio before the first tap');
+  await B2.tap(195, 420);
+  ok(await B2.eval('window.__ac') === 1, 'audio starts on the first tap');
+  await B2.close();
   console.log(fails ? `${fails} FAILED` : 'ALL OK');
   process.exit(fails ? 1 : 0);
 })();
