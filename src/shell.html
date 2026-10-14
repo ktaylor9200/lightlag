@@ -13,17 +13,17 @@
 <div id="app">
   <header id="top">
     <button id="lvlname" class="ghost" aria-label="Level"></button>
-    <div id="year" aria-live="polite">YEAR <b>0</b></div>
-    <button id="menuBtn" class="iconbtn" aria-label="Menu">&#9776;</button>
+    <div id="year" aria-live="polite"><span class="k">YEAR</span><b>0</b></div>
+    <button id="menuBtn" class="iconbtn" aria-label="Menu"><span class="burger"></span></button>
+    <div id="tickbar"></div>
   </header>
-  <button id="obj" class="ghost"></button>
+  <button id="obj" class="ghost"><span id="objtext"></span><span class="i" aria-hidden="true">i</span></button>
   <div id="boardwrap">
     <canvas id="board" aria-label="Board"></canvas>
-    <div id="coach" class="hidden"></div>
-    <div id="toast" class="hidden"></div>
+    <div id="float"><div id="toast" class="hidden"></div><div id="coach" class="hidden"></div></div>
   </div>
   <div id="dock">
-    <button id="log" class="ghost"><span class="sym">&#8961;</span><span id="logtext"></span><span id="logact"></span></button>
+    <button id="log" class="ghost"><span class="sym" aria-hidden="true"></span><span id="logtext"></span><span id="logact"></span></button>
     <div id="outbox"></div>
     <div id="chips"></div>
     <div id="primaryRow">
@@ -33,7 +33,7 @@
   </div>
 </div>
 <div id="sheetBack" class="hidden"></div>
-<div id="sheet" class="hidden" role="dialog"><div id="sheetGrip"></div><div id="sheetBody"></div></div>
+<div id="sheet" class="hidden" role="dialog"><div id="sheetGrip"></div><button id="sheetX" aria-label="Close">&#10005;</button><div id="sheetBody"></div></div>
 <div id="overlay" class="hidden"></div>
 <script>
 /*JS*/

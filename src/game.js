@@ -33,18 +33,23 @@ const STARS = Array.from({ length: 70 }, () => [Math.random(), Math.random(), 0.
 
 // ---------- canvas ----------
 const canvas = $('board'), ctx = canvas.getContext('2d');
-let geom = null;
+let geom = null, lastLayout = '';
+const CHIP_ROW = 44 + 6; // an outbox or chips row plus the dock gap
 function layout() {
   if (!G.L) return;
-  const wrap = $('boardwrap');
-  const w = wrap.clientWidth, h = wrap.clientHeight;
-  // size against the tallest dock so the board doesn't jump when chips appear
-  const reserved = innerHeight - 48 - 32 - 236;
-  let side = Math.min(w - 8, Math.max(reserved, 0));
-  if (side < 240 || side > h) side = Math.min(w - 8, h - 4);
-  side = Math.max(140, Math.floor(side));
+  const wrap = $('boardwrap'), dock = $('dock');
+  const w = wrap.clientWidth, top = wrap.getBoundingClientRect().top;
+  // Size and place the board against the tallest dock (outbox and chips both
+  // showing), so the board never moves when orders are queued or a drone is selected.
+  const dockMax = dock.offsetHeight + ($('outbox').childElementCount ? 0 : CHIP_ROW) + ($('chips').childElementCount ? 0 : CHIP_ROW);
+  const avail = Math.floor(dock.getBoundingClientRect().bottom - top - dockMax);
+  const side = Math.max(140, Math.floor(Math.min(w - 8, avail - 4)));
+  const mt = Math.max(0, Math.floor((avail - side) / 2));
   const dpr = Math.min(3, window.devicePixelRatio || 1);
-  canvas.style.width = side + 'px'; canvas.style.height = side + 'px';
+  const key = [side, mt, dpr, G.L.R].join();
+  if (key === lastLayout && geom) return;
+  lastLayout = key;
+  canvas.style.width = side + 'px'; canvas.style.height = side + 'px'; canvas.style.marginTop = mt + 'px';
   canvas.width = Math.round(side * dpr); canvas.height = Math.round(side * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   geom = makeGeom(side, side, G.L.R);
@@ -52,14 +57,27 @@ function layout() {
 window.addEventListener('resize', () => { layout(); if (replayCtl) replayCtl.resize(); });
 if (window.ResizeObserver) new ResizeObserver(() => layout()).observe($('boardwrap'));
 
+// the light of the last required event reaching Home (drawn on the confirming year)
+function confirmFx() {
+  if (!G.won) return null;
+  if (G.out) return { at: G.out.confirmed_at_home, pts: G.out.req.filter((e) => SIM.seenTick(e) === G.out.confirmed_at_home).map((e) => e.pos) };
+  if (G.fin && G.fin.endSeen !== null) return { at: G.fin.endSeen, pts: [G.fin.forward ? G.fin.forward.pos : FIN.W] };
+  return null;
+}
 function frame() {
   return {
     level: G.L, res: G.res, now: G.now, p: G.p, mode: 'seen', unlock: G.unlock, exitSeen: G.exitSeen, exitTrue: G.exitTrue,
     showHidden: false, fin: G.fin, clock: performance.now(), stars: STARS, ui: Object.assign({ selected: G.sel }, G.ui),
+    reduced: reduced(), confirm: confirmFx(),
   };
 }
+const tickbar = $('tickbar');
+let tickOn = false;
 function loop(t) {
-  if (G.p < 1) G.p = Math.min(1, (t - G.animT0) / ANIM);
+  if (G.p < 1) G.p = Math.max(0, Math.min(1, (t - G.animT0) / ANIM));
+  // a hairline under the top bar fills while each year passes
+  if (G.p < 1) { tickbar.style.transform = `scaleX(${G.p.toFixed(3)})`; if (!tickOn) { tickbar.classList.add('on'); tickOn = true; } }
+  else if (tickOn) { tickbar.style.transform = 'scaleX(1)'; tickbar.classList.remove('on'); tickOn = false; }
   if (G.L && geom && $('overlay').classList.contains('hidden')) render(ctx, geom, frame());
   if (replayCtl) replayCtl.tick(t);
   if (waveCtl) waveCtl(t);
@@ -96,10 +114,12 @@ function advance() {
   const sent = G.queue.length;
   for (const o of G.queue) G.plan.push(Object.assign({ t: G.now }, o));
   G.queue = [];
-  if (sent) { resim(); AU.thoom(); G.sel = null; G.mode = 'move'; }
+  if (sent) {
+    resim(); AU.thoom(); G.sel = null; G.mode = 'move';
+    const pr = $('primary'); pr.classList.remove('sent'); void pr.offsetWidth; pr.classList.add('sent');
+  }
   G.now++;
   G.p = reduced() ? 1 : 0; G.animT0 = performance.now();
-  const yb = $('year'); yb.classList.remove('bump'); void yb.offsetWidth; yb.classList.add('bump');
   const news = processYear(G.now);
   tutorialAfterAdvance(sent);
   updateUI();
@@ -120,8 +140,8 @@ function processYear(n) {
       if (w && w.hidden) hiddenGlint = w; else glint = true;
     } else if (e.type === 'sign') { AU.sign(); addLog(`${nm(e.data)} signed. (Year ${e.t}, seen year ${n}.)`); }
     else if (e.type === 'offended') { AU.object(); onOffended(e); }
-    else if (e.type === 'tag') addLog(`Seen: ${e.data[1]} tagged ${e.data[0]} in year ${e.t}.`);
-    else if (e.type === 'rec_on') addLog(`Seen: the relay woke in year ${e.t}.`);
+    else if (e.type === 'tag') { AU.tag(); addLog(`Seen: ${e.data[1]} tagged ${e.data[0]} in year ${e.t}.`); }
+    else if (e.type === 'rec_on') { AU.wake(); addLog(`Seen: the relay woke in year ${e.t}.`); }
     else if (e.type === 'exit') onExit(e);
     else if (e.type === 'split') { addLog(`${nm(e.data[0])} has divided. ${nm(e.data[1])} has been independent since year ${e.t}. Nobody has asked it anything.`); unlockCodex('split'); setCoach(`${nm(e.data[0])} has divided. Requests addressed to ${nm(e.data[0])} do not count for ${nm(e.data[1])}.`, { dismiss: true }); }
     else if (e.type === 'declined') addLog(`${e.data[0]}: noted.`);
@@ -142,12 +162,8 @@ function processYear(n) {
     news = true;
     const chg = G.flags.chg[key] = G.flags.chg[key] || [];
     chg.push(n);
-    if (key.startsWith('der:') && G.n >= 2 && chg.length >= 2 && chg[chg.length - 2] === n - 2 && SIM.ring(b[1]) < SIM.ring(a[1]) && !has('hurry')) {
-      unlockCodex('hurry'); addLog(CODEX.hurry.b);
-    }
-    if (key.startsWith('drone:') && chg.length >= 2 && chg[chg.length - 2] === n - 1 && SIM.ring(b[1]) < SIM.ring(a[1]) && !has('fastdrone')) {
-      unlockCodex('fastdrone'); addLog(CODEX.fastdrone.b);
-    }
+    if (key.startsWith('der:') && G.n >= 2 && chg.length >= 2 && chg[chg.length - 2] === n - 2 && SIM.ring(b[1]) < SIM.ring(a[1]) && !has('hurry')) discover('hurry');
+    if (key.startsWith('drone:') && chg.length >= 2 && chg[chg.length - 2] === n - 1 && SIM.ring(b[1]) < SIM.ring(a[1]) && !has('fastdrone')) discover('fastdrone');
   }
   for (const id in G.unlock) if (G.unlock[id] === n) {
     news = true;
@@ -159,6 +175,11 @@ function processYear(n) {
 }
 const has = (k) => G.save.codex.includes(k);
 function unlockCodex(k) { if (!has(k)) { G.save.codex.push(k); persist(); } }
+// a discovery gets the whole line, not a truncated log entry
+function discover(k) {
+  unlockCodex(k); addLog(CODEX[k].b);
+  if (!(G.tut >= 0 && G.tut < 4)) setCoach(CODEX[k].b, { dismiss: true, kicker: 'Codex · ' + CODEX[k].t });
+}
 
 function onOffended(e) {
   const N = Math.min(...e.cause);
@@ -168,7 +189,7 @@ function onOffended(e) {
   if (G.n === 6) {
     const askers = {};
     for (const o of G.plan) if (o.kind === 'FLASH' && o.arg) (askers[o.who] = askers[o.who] || new Set()).add(o.arg);
-    if (Object.values(askers).some((s) => s.has('P') && s.has('Q')) && !has('departure')) { unlockCodex('departure'); addLog(CODEX.departure.b); }
+    if (Object.values(askers).some((s) => s.has('P') && s.has('Q')) && !has('departure')) discover('departure');
   }
 }
 function onExit(e) {
@@ -198,7 +219,7 @@ function onWin() {
   setCoach(`Confirmed. It happened in year ${o.happened_at}. You found out in year ${o.confirmed_at_home}.`);
   updateUI();
   const token = G.levelToken;
-  setTimeout(() => { if (G.won && G.levelToken === token) showWin(); }, reduced() ? 400 : 1500);
+  setTimeout(() => { if (G.won && G.levelToken === token) showWin(); }, reduced() ? 900 : 1800);
 }
 
 function rewindTo(y) {
@@ -310,7 +331,11 @@ function knownTargets() {
     if (r.cell) out.push({ id: r.id, kind: 'fix', pos: r.cell, color: COL.relay });
     else if (SIM.seenPos(G.res.hist['der:' + r.ride], G.now)) out.push({ id: r.id, kind: 'ride', ride: r.ride, color: COL.relay });
   }
-  for (const w of knownWatchers()) out.push({ id: w.id, kind: 'fix', pos: w.pos, born: w.born, color: '#dccbff' });
+  for (const w of knownWatchers()) {
+    // once Home has seen a watcher sign or object, other people's requests can't change it
+    const settled = G.res.events.some((e) => (e.type === 'sign' || e.type === 'offended') && e.data === w.id && SIM.seenTick(e) <= G.now);
+    out.push({ id: w.id, kind: 'fix', pos: w.pos, born: w.born, color: '#dccbff', settled });
+  }
   if (G.L.world) out.push({ id: 'W', kind: 'fix', pos: FIN.W, color: COL.world });
   return out;
 }
@@ -359,6 +384,7 @@ function computeTags() {
         if (!o.queued && at !== '?' && at < G.now) continue;
         const addressed = o.arg && k.id === o.arg;
         if (G.L.world && k.id === 'W' && !addressed) continue;
+        if (k.settled && !addressed) continue;
         tags.push({ pos, text: `${addressed ? '\u2192 ' : ''}reaches yr ${at}`, color: k.color, queued: !!o.queued });
         if (addressed || (!o.arg && k.kind !== 'fix') || (!o.arg && G.L.receivers && G.L.receivers.some((r) => r.id === k.id))) txt = `reaches ${nm(k.id)} yr ${at}`;
       }
@@ -372,14 +398,24 @@ function computeTags() {
 }
 
 // ---------- UI ----------
+let shownYear = null;
+function setText(id, text) { const el = $(id); if (el.textContent !== text) el.textContent = text; }
 function updateUI() {
   const L = G.L; if (!L) return;
-  $('lvlname').innerHTML = `<span class="n">${G.n} \u00b7</span>${esc(L.name)}`;
-  $('year').innerHTML = `YEAR <b>${G.now}</b>`;
+  const ln = $('lvlname'), lnHTML = `<span class="n">${G.n} \u00b7</span>${esc(L.name)}`;
+  if (ln.innerHTML !== lnHTML) { ln.innerHTML = lnHTML; ln.classList.remove('tight'); }
+  if (!ln.classList.contains('tight') && ln.scrollWidth > ln.clientWidth + 1) ln.classList.add('tight'); // long names drop the number
+  // the year rolls only when it changes (not on every tap)
+  const yb = $('year').querySelector('b');
+  if (shownYear !== G.now) {
+    const fwd = shownYear !== null && G.now === shownYear + 1;
+    yb.textContent = G.now; shownYear = G.now;
+    yb.classList.remove('roll'); if (fwd) { void yb.offsetWidth; yb.classList.add('roll'); }
+  }
   // objective
   let obj = L.objective.text;
   if (G.n === 8) obj = G.fin.sentYear !== null ? (G.fin.kind === 'delegate' || G.plan.some((o) => o.kind === 'STANDING') ? 'Petition 1: transferred to V.' : 'Petition 1: answered. Reply pending.') : 'Petition 1: pending.';
-  $('obj').innerHTML = `${esc(obj)} <span class="i">info</span>`;
+  setText('objtext', obj);
   // tags
   const ct = computeTags();
   const hl = [];
@@ -387,11 +423,14 @@ function updateUI() {
   if (G.tut === 1) { const sp = SIM.seenPos(G.res.hist['der:D1'], G.now); if (sp) hl.push(sp[1]); }
   G.ui = { tags: ct.tags, moveLines: ct.lines, highlight: hl };
   // outbox
-  const ob = $('outbox'); ob.innerHTML = '';
+  const ob = $('outbox');
+  const had = new Set([...ob.children].map((c) => c.dataset.k)); // only new orders animate in
+  ob.innerHTML = '';
   G.queue.forEach((o, i) => {
-    const b = document.createElement('span'); b.className = 'chip out';
+    const b = document.createElement('span'), k = [o.kind, o.who, o.arg].join('|');
+    b.className = 'chip out' + (had.has(k) ? ' old' : ''); b.dataset.k = k;
     const what = o.kind === 'MOVE' ? 'move' : o.kind === 'STANDING' ? 'standing' : o.kind === 'PING' ? (o.arg === 'W' ? 'answer W' : `ask ${nm(o.arg)}`) : o.arg ? (o.arg === 'W' ? 'answer W' : `ask ${nm(o.arg)}`) : 'flash';
-    b.innerHTML = `${o.who === 'HOME' ? 'Home' : esc(o.who)} \u2192 ${esc(what)}${ct.info[i] ? ' \u00b7 ' + esc(ct.info[i]) : ''}`;
+    b.innerHTML = `<span class="who">${o.who === 'HOME' ? 'Home' : esc(o.who)}</span> \u2192 ${esc(what)}${ct.info[i] ? ` <span class="eta">\u00b7 ${esc(ct.info[i])}</span>` : ''}`;
     if (G.tut !== 2) {
       const x = document.createElement('button'); x.className = 'x'; x.setAttribute('aria-label', 'Remove order'); x.textContent = '\u2715';
       x.onclick = (ev) => { ev.stopPropagation(); G.queue.splice(i, 1); updateUI(); };
@@ -400,8 +439,11 @@ function updateUI() {
     ob.appendChild(b);
   });
   // chips
-  const ch = $('chips'); ch.innerHTML = '';
+  const ch = $('chips');
+  const hadAnswer = !!ch.querySelector('.answerBtn');
+  ch.innerHTML = '';
   const chip = (label, cls, fn, aria) => { const b = document.createElement('button'); b.className = 'chip ' + (cls || ''); b.innerHTML = label; if (aria) b.setAttribute('aria-label', aria); b.onclick = (ev) => { ev.stopPropagation(); AU.init(); stopFF(); fn(); }; ch.appendChild(b); return b; };
+  const chipHint = (text) => { const h = document.createElement('span'); h.className = 'chip hint'; h.textContent = text; ch.appendChild(h); };
   const fin = G.fin, callSeen = G.n === 8 && G.now >= 10;
   const decisiveQueued = G.queue.some((o) => (o.arg === 'W') || o.kind === 'STANDING');
   const decisiveSent = fin && fin.sentYear !== null;
@@ -415,27 +457,35 @@ function updateUI() {
       chip('STANDING', 'blue', () => confirmSheet('Give standing', 'Give V the right to decide. It will no longer take your orders.', 'Give standing', () => { G.queue = G.queue.filter((o) => o.who !== 'V'); G.queue.push({ kind: 'STANDING', who: 'V', arg: null }); G.sel = null; updateUI(); }));
     }
     chip('\u2715', '', deselect, 'Deselect');
+    // say what the next tap does, while there is room for it
+    if (ch.children.length <= 3 && !(G.tut >= 0 && G.tut < 4)) {
+      const aimed = G.queue.some((o) => o.kind === 'MOVE' && o.who === id);
+      chipHint(G.mode === 'ask' ? 'Tap a watcher.' : aimed ? 'Tap to re-aim.' : 'Tap a hex to aim.');
+    }
   } else if (G.sel === 'HOME' && !G.won) {
     chip('ASK', 'violet on', () => {});
-    const hint = document.createElement('span'); hint.className = 'chip'; hint.style.border = '0'; hint.style.background = 'none'; hint.style.color = 'var(--dim)'; hint.style.fontWeight = '500';
-    hint.textContent = 'Tap a watcher.'; ch.appendChild(hint);
     chip('\u2715', '', deselect, 'Deselect');
+    chipHint('Tap a watcher.');
   } else if (G.n === 8 && callSeen && !decisiveSent && !decisiveQueued && !G.locked && !G.won) {
-    const b = document.createElement('button'); b.className = 'answerBtn'; b.textContent = 'Answer them';
+    const b = document.createElement('button'); b.className = 'answerBtn' + (hadAnswer ? ' old' : ''); b.textContent = 'Answer them';
     b.onclick = () => { AU.init(); confirmSheet('Answer them', 'This cannot be recalled. It reaches them in 5 years, and they will be ten years older than the voices you heard.', 'Send', () => { G.queue.push({ kind: 'PING', who: 'HOME', arg: 'W' }); updateUI(); }); };
     ch.appendChild(b);
   }
+  ch.classList.toggle('compact', ch.querySelectorAll('button').length > 3);
+  const hint = ch.querySelector('.hint');
+  if (hint && ch.scrollWidth > ch.clientWidth + 1) hint.remove(); // never a clipped hint
   // primary
-  const pr = $('primary'); pr.className = 'primary'; pr.disabled = false;
-  let lab = 'WAIT \u25B8';
+  const pr = $('primary');
+  let lab = 'WAIT \u25B8', state = '';
   if (G.n === 8 && G.finIntro < 3) lab = 'CONTINUE \u25B8';
-  else if (G.queue.length) { lab = `TRANSMIT ${G.queue.length} \u25B8`; pr.classList.add('tx'); }
-  else if (G.n === 8 && decisiveSent) { lab = 'LISTENING \u25B8'; pr.classList.add('listen'); }
-  else if (G.n === 8 && callSeen) { lab = 'PENDING \u25B8'; pr.classList.add('pend'); }
-  if (G.locked) { pr.disabled = true; lab = G.n === 8 && !decisiveSent ? 'PENDING' : lab; }
-  if (G.won) pr.disabled = true;
-  if (G.tut === 2 || G.tut === 3) pr.classList.add('pulse');
-  pr.textContent = lab;
+  else if (G.queue.length) { lab = `TRANSMIT ${G.queue.length} \u25B8`; state = 'tx'; }
+  else if (G.n === 8 && decisiveSent) { lab = 'LISTENING \u25B8'; state = 'listen'; }
+  else if (G.n === 8 && callSeen) { lab = 'PENDING \u25B8'; state = 'pend'; }
+  if (G.locked) lab = G.n === 8 && !decisiveSent ? 'PENDING' : lab;
+  for (const c of ['tx', 'listen', 'pend']) pr.classList.toggle(c, c === state);
+  pr.classList.toggle('pulse', G.tut === 2 || G.tut === 3);
+  pr.disabled = !!(G.locked || G.won);
+  setText('primary', lab);
   const ff = $('ff');
   ff.disabled = G.n === 8 || G.won || G.locked || (G.tut >= 0 && G.tut < 4);
   ff.classList.toggle('on', !!G.ff);
@@ -459,17 +509,20 @@ function scheduleLogLine() {
   if (logShown < G.logs.length - 2) logShown = G.logs.length - 2; // don't lag too far behind
   step();
 }
+let shownAct = null;
 function renderLogLine(fresh) {
   const l = G.logs[Math.min(logShown, G.logs.length - 1)];
   const lt = $('logtext'), la = $('logact');
   lt.textContent = l ? l.text : '';
-  if (fresh) { lt.classList.remove('fresh'); void lt.offsetWidth; lt.classList.add('fresh'); }
-  la.innerHTML = '';
+  if (fresh) for (const el of [lt, $('log')]) { el.classList.remove('fresh'); void el.offsetWidth; el.classList.add('fresh'); }
   // the newest open action (smart rewind) stays reachable
   const act = [...G.logs].reverse().find((x) => x.action && !x.used && x.y <= G.now);
-  if (act && !G.won) {
-    const b = document.createElement('button'); b.textContent = act.action.label + ' \u21BA';
-    b.onclick = (ev) => { ev.stopPropagation(); act.used = true; act.action.fn(); };
+  const want = act && !G.won ? act : null;
+  if (want === shownAct && (!want || la.childElementCount)) return;
+  shownAct = want; la.innerHTML = '';
+  if (want) {
+    const b = document.createElement('button'); b.textContent = want.action.label + ' \u21BA';
+    b.onclick = (ev) => { ev.stopPropagation(); want.used = true; want.action.fn(); };
     la.appendChild(b);
   }
 }
@@ -478,7 +531,7 @@ function renderLogLine(fresh) {
 let coachOpts = {};
 function setCoach(text, opts = {}) {
   const c = $('coach'); coachOpts = opts;
-  c.innerHTML = esc(text) + (opts.tap ? '<span class="more">TAP TO CONTINUE</span>' : opts.dismiss ? '<span class="more">TAP TO DISMISS</span>' : '');
+  c.innerHTML = (opts.kicker ? `<span class="kick">${esc(opts.kicker)}</span>` : '') + esc(text) + (opts.tap ? '<span class="more">TAP TO CONTINUE</span>' : opts.dismiss ? '<span class="more">TAP TO DISMISS</span>' : '');
   c.classList.remove('hidden'); c.classList.toggle('tap', !!(opts.tap || opts.dismiss));
 }
 function clearCoach() { $('coach').classList.add('hidden'); coachOpts = {}; }
@@ -492,6 +545,7 @@ function untilNews() {
   if ($('ff').disabled) return;
   AU.init();
   if (G.ff) { stopFF(); return; }
+  if (!G.save.ffSeen) { G.save.ffSeen = true; persist(); toast('Until news: years pass until something changes. Eight at most.'); }
   let k = 0;
   const step = () => {
     if (!G.ff) return;
@@ -512,6 +566,7 @@ function openSheet(html, mount) {
 }
 function closeSheet() { $('sheet').classList.add('hidden'); $('sheetBack').classList.add('hidden'); }
 $('sheetBack').addEventListener('click', closeSheet);
+$('sheetX').addEventListener('click', closeSheet);
 function confirmSheet(title, body, yes, fn) {
   openSheet(`<h2>${esc(title)}</h2><p>${esc(body)}</p><div class="btnrow"><button id="cNo">Not yet</button><button class="go" id="cYes">${esc(yes)}</button></div>`, (el) => {
     el.querySelector('#cNo').onclick = closeSheet;
@@ -566,22 +621,24 @@ function inspect(hex) {
   if (L.world && G.fin.probe) { const ps = FIN.probeSeen(G.now); if (ps && SIM.eq(ps[1], hex)) parts.push(`<h2><span class="k">Their instrument</span>A probe</h2><p>Coming this way at half the speed of light. It appears to hurry. It isn't hurrying. Seen as it was ${G.now - ps[0]} years ago.</p>`); }
   if (SIM.eq(hex, SIM.HOME)) parts.push(`<h2><span class="k">You</span>HOME</h2><p>An old, careful listening post. You see everything as it was. Your orders arrive late.</p>`);
   if (!parts.length) { const r = SIM.ring(hex); toast(r === 0 ? 'Home.' : `Ring ${r}. Light from here is ${r} year${r === 1 ? '' : 's'} old.`); return; }
-  openSheet(parts.join('<hr style="border:0;border-top:1px solid var(--line);margin:12px 0">'));
+  openSheet(parts.join('<hr>'));
 }
 
 function openMenu() {
   AU.init();
   const s = G.save.settings;
-  openSheet(`<div class="menu">
+  openSheet(`<h2><span class="k">Level ${G.n} · Year ${G.now}</span>${esc(G.L.name)}</h2><div class="menu">
     <button id="mRestart">Restart level</button>
     <button id="mRewind" ${G.now === 0 || G.locked ? 'disabled' : ''}>Rewind 1 year <span class="v">to year ${Math.max(0, G.now - 1)}</span></button>
     <button id="mHint">Hint</button>
-    <button id="mLevels">Level select</button>
-    <button id="mLog">Home log</button>
-    <button id="mCodex">Codex <span class="v">${G.save.codex.length} found</span></button>
-    <button id="mScale">How light works here</button>
-    <button id="mSound">Sound <span class="v">${s.sound ? 'On' : 'Off'}</span></button>
-    <button id="mMotion">Reduced motion <span class="v">${s.reduced ? 'On' : mqReduce.matches ? 'On (system)' : 'Off'}</span></button>
+    <div class="grid">
+      <button id="mLevels">Level select</button>
+      <button id="mLog">Home log</button>
+      <button id="mCodex">Codex <span class="v">${G.save.codex.length} of ${Object.keys(CODEX).length} found</span></button>
+      <button id="mScale">How light works</button>
+      <button id="mSound">Sound <span class="v${s.sound ? ' on' : ''}">${s.sound ? 'On' : 'Off'}</span></button>
+      <button id="mMotion">Reduced motion <span class="v${s.reduced || mqReduce.matches ? ' on' : ''}">${s.reduced ? 'On' : mqReduce.matches ? 'On (system)' : 'Off'}</span></button>
+    </div>
   </div>`, (el) => {
     el.querySelector('#mRestart').onclick = () => { closeSheet(); if (G.locked && G.n === 8) return; loadLevel(G.n); };
     el.querySelector('#mRewind').onclick = () => { closeSheet(); rewindTo(G.now - 1); };
@@ -609,7 +666,7 @@ function openLevels() {
   const all = G.save.endingsFound.length > 0;
   const row = (n) => {
     const L = levelData(n); const lock = !all && n > G.save.reached;
-    return `<button data-n="${n}" ${lock ? 'disabled' : ''}><span class="num">${n}</span>${lock ? 'Locked' : esc(L.name)}${G.save.cleared.includes(n) ? '<span class="done">\u2713</span>' : ''}</button>`;
+    return `<button data-n="${n}" ${lock ? 'disabled' : ''} class="${n === G.n ? 'cur' : ''}"><span class="num">${n}</span>${lock ? 'Locked' : esc(L.name)}${G.save.cleared.includes(n) ? '<span class="done">\u2713</span>' : ''}</button>`;
   };
   openSheet(`<h2>Levels</h2><div class="lv"><div class="act">Act I \u00b7 Home</div>${[1, 2, 3, 4].map(row).join('')}<div class="act">Act II \u00b7 Neighbours</div>${[5, 6, 7].map(row).join('')}<div class="act">Act III</div>${row(8)}</div>
     ${G.save.endingsFound.length ? `<p class="found" style="margin-top:12px">Endings found: ${G.save.endingsFound.length} of 3</p>` : ''}`, (el) => {
@@ -633,7 +690,7 @@ function openObjective() {
   if (L.receivers) extra += L.receivers.map((r) => `<p class="rule">Relay ${esc(r.id)} wakes if ${r.need} open signals reach it in the same year.</p>`).join('');
   if (actOf(G.n) === 2) extra += '<p class="rule">Precedents sign only if the first request they hear is addressed to them. Ties are not first.</p>';
   if (G.n === 8) extra = '<p>Petition 1. Opened before this world had oxygen. Requires: the consent of its inhabitants.</p>';
-  openSheet(`<h2><span class="k">Objective</span>${esc($('obj').textContent.replace(/ info$/, ''))}</h2>${extra}
+  openSheet(`<h2><span class="k">Objective</span>${esc($('objtext').textContent)}</h2>${extra}
     <p>You win when the light from your success reaches Home, not when it happens.</p>
     <div class="btnrow"><button id="oScale">How light works here</button><button id="oHint">Hint</button></div>`, (el) => {
     el.querySelector('#oScale').onclick = openScale; el.querySelector('#oHint').onclick = openHints;
@@ -680,8 +737,10 @@ function cards(list, done, render) {
 // progressive lines: each tap adds a line on the same card
 function stack(head, lines, done, cls = 'line') {
   let i = 1;
+  const clsOf = typeof cls === 'function' ? cls : () => cls;
   const show = () => {
-    showOverlay(`<div class="card">${head || ''}${lines.slice(0, i).map((l, k) => `<div class="${cls}" style="animation-delay:${k === i - 1 ? 0 : 0}s">${esc(l)}</div>`).join('')}</div><div class="tapmore">tap</div>`, {
+    // only the newest line fades in; earlier ones stay put
+    showOverlay(`<div class="card${i > 1 ? ' still' : ''}">${head || ''}${lines.slice(0, i).map((l, k) => `<div class="${clsOf(k)}${k < i - 1 ? ' prev' : ''}">${esc(l)}</div>`).join('')}</div><div class="tapmore">tap</div>`, {
       tap: () => { if (i < lines.length) { i++; show(); } else done(); },
     });
   };
@@ -690,12 +749,13 @@ function stack(head, lines, done, cls = 'line') {
 
 function showTitle() {
   const cont = G.save.reached > 1;
-  showOverlay(`<div class="card"><div class="title">LIGHT LAG</div><div class="sub">Everything you can see has already happened.</div>
-    <div style="height:18px"></div>
+  showOverlay(`<div class="card"><div class="titlewrap"><div class="halo"></div><div class="halo b"></div><div class="title">LIGHT LAG</div></div>
+    <div class="sub">Everything you can see has already happened.</div>
+    <div style="height:14px"></div>
     <button class="bigbtn" id="tPlay">${cont ? `CONTINUE \u00b7 LEVEL ${Math.min(8, G.save.reached)}` : 'BEGIN'}</button>
     ${cont ? '<button class="ghostbtn" id="tLevels">Level select</button>' : ''}
     ${G.save.endingsFound.length ? `<div class="found">Endings found: ${G.save.endingsFound.length} of 3</div>` : ''}
-    <div class="caption" style="margin-top:8px">Headphones help. About 30 minutes.</div></div>`);
+    <div class="caption" style="margin-top:6px">Headphones help. About 30 minutes.</div></div>`);
   $('tPlay').onclick = () => { AU.init(); startLevel(Math.min(8, G.save.reached)); };
   const lv = $('tLevels'); if (lv) lv.onclick = () => { AU.init(); hideOverlay(); loadLevel(Math.min(8, G.save.reached)); openLevels(); };
 }
@@ -718,7 +778,7 @@ let replayCtl = null;
 function stopReplay() { replayCtl = null; }
 function startReplay(host, opts) {
   const cv = host.querySelector('canvas'), c2 = cv.getContext('2d');
-  const slider = host.querySelector('input'), ylab = host.querySelector('.y'), rl = host.querySelector('.rlabel');
+  const slider = host.querySelector('input'), ylab = host.querySelector('.y'), rl = host.querySelector('.rlabel'), rm = host.querySelector('.rmode');
   const segs = host.querySelectorAll('.seg button');
   const R = opts.level.R;
   let mode = 'true', v = 0, playing = true, t0 = performance.now(), g = null;
@@ -726,10 +786,16 @@ function startReplay(host, opts) {
   const unlock = {}; for (const d of opts.level.derelicts || []) unlock[d.id] = SIM.firstSeenMove(opts.level, d.id);
   const exitSeen = {}, exitTrue = {};
   for (const e of opts.res.events) if (e.type === 'exit') { exitTrue[e.data] = e.t; exitSeen[e.data] = SIM.seenTick(e); }
+  // the replay board takes whatever height the rest of the screen leaves
   function resize() {
     const maxW = Math.min(host.clientWidth || 340, 420);
-    const maxH = Math.max(160, innerHeight - (opts.tall ? 260 : 350));
-    const side = Math.floor(Math.min(maxW, maxH));
+    let side = maxW;
+    if (opts.fit) {
+      cv.style.width = '0px'; cv.style.height = '0px';
+      const cs = getComputedStyle(ov), padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      side = Math.min(maxW, ov.clientHeight - padV - opts.fit.scrollHeight - 2);
+    }
+    side = Math.max(150, Math.floor(side));
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     cv.style.width = side + 'px'; cv.style.height = side + 'px'; cv.width = side * dpr; cv.height = side * dpr;
     c2.setTransform(dpr, 0, 0, dpr, 0, 0); g = makeGeom(side, side, R);
@@ -739,40 +805,53 @@ function startReplay(host, opts) {
   slider.oninput = () => { playing = false; v = +slider.value; };
   segs.forEach((b) => { b.onclick = () => { mode = b.dataset.m; segs.forEach((x) => x.classList.toggle('on', x === b)); }; });
   segs.forEach((x) => x.classList.toggle('on', x.dataset.m === mode));
+  const again = host.querySelector('.rbtn');
+  if (again) again.onclick = () => ctl.replay();
   const ctl = {
     resize,
     replay() { v = 0; playing = true; t0 = performance.now(); },
     tick(t) {
-      if (playing) { v = Math.min(end, (t - t0) / dur * end); if (v >= end) playing = false; slider.value = v; }
+      if (playing) {
+        v = Math.max(0, Math.min(end, (t - t0) / dur * end));
+        if (reduced()) v = Math.floor(v); // whole years only: no sliding
+        if (v >= end) playing = false;
+        slider.value = v;
+      }
       const now = Math.max(0, Math.ceil(v - 1e-9)), p = now === 0 ? 1 : v - now + 1;
-      render(c2, g, { level: opts.level, res: opts.res, now, p, mode, unlock, exitSeen, exitTrue, showHidden: opts.showHidden, fin: opts.fin, clock: t, stars: STARS, newsEvents: opts.news, noLabels: true, ui: { tags: [], moveLines: [], highlight: [] } });
+      render(c2, g, { level: opts.level, res: opts.res, now, p, mode, unlock, exitSeen, exitTrue, showHidden: opts.showHidden, fin: opts.fin, clock: t, stars: STARS, newsEvents: opts.news, noLabels: true, reduced: reduced(), confirm: opts.confirm || null, ui: { tags: [], moveLines: [], highlight: [] } });
       ylab.textContent = `year ${Math.floor(v)}`;
-      rl.textContent = mode === 'true' ? 'AS IT WAS: what was really happening' : 'AS SEEN: what Home could see at the time';
+      rm.textContent = mode === 'true' ? 'As it was' : 'As seen';
+      rl.textContent = mode === 'true' ? 'What was really happening.' : 'What Home could see at the time.';
     },
   };
   replayCtl = ctl;
   return ctl;
 }
 function replayHTML() {
-  return `<div class="replay"><canvas></canvas><div class="seg"><button data-m="seen">AS SEEN</button><button data-m="true">AS IT WAS</button></div><div class="scrub"><input type="range" min="0" value="0" aria-label="Scrub years"><span class="y"></span></div><div class="rlabel"></div></div>`;
+  return `<div class="replay"><div class="rbox"><canvas></canvas><div class="rtag"><span class="rmode"></span><span class="y"></span></div></div>
+    <div class="rctl"><div class="seg"><button data-m="seen">AS SEEN</button><button data-m="true">AS IT WAS</button></div><button class="rbtn" aria-label="Play the replay again">\u21BA</button></div>
+    <div class="scrub"><input type="range" min="0" value="0" aria-label="Scrub years"></div><div class="rlabel"></div></div>`;
 }
 function showWin() {
   const o = G.out, sc = SCRIPT[G.n];
   let end = sc.end;
   if (G.n === 1) end = `Confirmed. It happened ${WORDS[o.lag] || o.lag} year${o.lag === 1 ? '' : 's'} ago. You found out just now. This will keep happening.`;
-  showOverlay(`<div class="win"><div class="head">Confirmed \u00b7 ${esc(G.L.name)}</div>
+  showOverlay(`<div class="win"><div class="kicker">Level ${G.n} \u00b7 ${esc(G.L.name)}</div><div class="conf">Confirmed</div>
     <div class="when">It happened in year <b>${o.happened_at}</b>.<br>You found out in year <b>${o.confirmed_at_home}</b>.</div>
     <div class="end">${esc(end)}</div>${replayHTML()}
-    <div class="btnrow"><button id="wAgain">Replay level</button><button class="go" id="wNext">${G.n === 7 ? 'Onward \u25B8' : 'Next \u25B8'}</button></div></div>`);
-  startReplay(ov.querySelector('.replay'), { level: G.L, res: G.res, end: o.confirmed_at_home, news: o.req, showHidden: G.save.reached >= 5 && G.n >= 5 || G.save.reached >= 6 });
+    <div class="btnrow"><button id="wAgain">Play again</button><button class="go" id="wNext">${G.n === 7 ? 'Onward \u25B8' : 'Next \u25B8'}</button></div></div>`);
+  const confirm = { at: o.confirmed_at_home, pts: o.req.filter((e) => SIM.seenTick(e) === o.confirmed_at_home).map((e) => e.pos) };
+  startReplay(ov.querySelector('.replay'), { level: G.L, res: G.res, end: o.confirmed_at_home, news: o.req, confirm, fit: ov.querySelector('.win'), showHidden: G.save.reached >= 5 && G.n >= 5 || G.save.reached >= 6 });
   $('wAgain').onclick = () => { hideOverlay(); loadLevel(G.n); };
   $('wNext').onclick = nextAfterWin;
 }
+// act cards: the first line is the act's title
+const actCard = (lines, done) => stack('', lines, done, (k) => (k === 0 ? 'ttl2' : 'line'));
 function nextAfterWin() {
   const n = G.n, sc = SCRIPT[n];
   stopReplay();
-  if (n === 4) stack('', sc.actCard, () => showInterstitial(() => startLevel(5)), 'line');
-  else if (n === 7) stack('', sc.actCard, () => startLevel(8), 'line');
+  if (n === 4) actCard(sc.actCard, () => showInterstitial(() => startLevel(5)));
+  else if (n === 7) actCard(sc.actCard, () => startLevel(8));
   else startLevel(n + 1);
 }
 
@@ -786,24 +865,30 @@ function showInterstitial(done) {
     const L = LEVELS_JSON[n - 1];
     const ref = Object.entries(L.test_plans).find(([k]) => k.startsWith('reference'))[1];
     const plan = ref.map((x) => ({ t: x[0], kind: x[1], who: x[2], arg: x[3] }));
-    return { L, res: SIM.simulate(L, plan, 30) };
+    const res = SIM.simulate(L, plan, 30);
+    // each filed glint resolves into the watcher that made it
+    const reveal = {};
+    for (const e of res.events) if (e.type === 'glint' && reveal[e.data] === undefined) reveal[e.data] = e.t;
+    return { L, res, reveal };
   });
+  const SPAN = 3.6, YEARS = 16;
+  const t0 = performance.now(); // one clock for the whole sequence, so taps don't restart the boards
   const show = () => {
     const last = i >= TEXT.interstitial.length;
-    showOverlay(`<div class="card"><canvas id="icv"></canvas>${last ? '<div class="kicker">Act II</div><div class="ttl2">Neighbours</div>' : `<div class="line">${esc(TEXT.interstitial[i])}</div>`}</div><div class="tapmore">tap</div>`, {
+    showOverlay(`<div class="card inter"><canvas id="icv"></canvas><div class="itext">${last ? '<div class="kicker">Act II</div><div class="ttl2">Neighbours</div>' : `<div class="line">${esc(TEXT.interstitial[i])}</div>`}</div></div><div class="tapmore">tap</div>`, {
       tap: () => { if (last) { interCtl = null; done(); } else { i++; show(); } },
     });
     const cv = $('icv'), c2 = cv.getContext('2d');
     const side = Math.floor(Math.min(320, innerWidth - 48, innerHeight * 0.42));
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     cv.style.width = side + 'px'; cv.style.height = side + 'px'; cv.width = side * dpr; cv.height = side * dpr; c2.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const t0 = performance.now();
+    const g = makeGeom(side, side, 4);
     interCtl = (t) => {
-      const el = (t - t0) / 1000, bi = Math.floor(el / 3.2) % 3, b = boards[bi];
-      const v = (el % 3.2) / 3.2 * 16, now = Math.max(0, Math.ceil(v)), p = now === 0 ? 1 : v - now + 1;
-      const g = makeGeom(side, side, b.L.R);
-      const mir = b.res.wat.filter((w) => w.hidden).map((w) => w.pos);
-      render(c2, g, { level: b.L, res: b.res, now, p, mode: 'true', unlock: {}, exitSeen: {}, exitTrue: {}, showHidden: true, clock: t, stars: STARS, noLabels: true, ui: { tags: [], moveLines: [], highlight: mir } });
+      const el = Math.max(0, t - t0) / 1000, bi = Math.floor(el / SPAN) % 3, b = boards[bi];
+      let v = (el % SPAN) / SPAN * YEARS;
+      if (reduced()) v = Math.floor(v);
+      const now = Math.max(0, Math.ceil(v)), p = now === 0 ? 1 : v - now + 1;
+      render(c2, g, { level: b.L, res: b.res, now, p, mode: 'true', unlock: {}, exitSeen: {}, exitTrue: {}, showHidden: true, reveal: b.reveal, clock: t, stars: STARS, noLabels: true, reduced: reduced(), ui: { tags: [], moveLines: [], highlight: [] } });
     };
   };
   show();
@@ -872,7 +957,7 @@ function showEnding(k) {
   const stampCls = k === 'answer' ? '' : k === 'delegate' ? 'gold' : 'blue';
   const doc = `<div class="stampwrap"><div class="doc">PETITION 1<br>Opened: before oxygen<br>Requires: consent of its inhabitants<br>Year: ${G.now}<br>Status:</div><div class="stamp ${stampCls}">${esc(E.stamp)}</div></div>`;
   const steps = [];
-  steps.push(() => { showOverlay(`<div class="card"><div class="kicker">Ending \u00b7 ${esc(E.name)}</div>${doc}</div><div class="tapmore">tap</div>`, { tap: next }); setTimeout(() => AU.stamp(), reduced() ? 0 : 650); });
+  steps.push(() => { showOverlay(`<div class="card"><div class="kicker">Ending \u00b7 ${esc(E.name)}</div>${doc}</div><div class="tapmore">tap</div>`, { tap: next }); setTimeout(() => AU.stamp(), reduced() ? 0 : 900); });
   const lines = (arr, cls) => steps.push(() => stack(`<div class="kicker">${esc(E.name)}</div>`, arr, next, cls || 'line'));
   if (k === 'answer') {
     lines(['You answered a question that was ten years old by the time your reply arrived.',
@@ -880,7 +965,7 @@ function showEnding(k) {
     steps.push(() => forest(['Light could show you their forests. It could never give you one.'].concat(f.probe ? ['They had already sent an instrument of their own toward you. It will arrive to find the door open.'] : []), next));
   } else if (k === 'delegate') {
     lines(["You couldn't ask them without answering them, so you gave the question to someone close enough to hear the answer still being given."]);
-    steps.push(() => showOverlay(`<div class="card"><div class="kicker">Forwarded by V</div><div class="stampwrap"><div class="doc">I listened until I was sure they were still asking. I answered with terms either side may withdraw from. The ones who said not yet are recorded. No participant warrants the absence of unknown harm.<br><br>\u2014 V</div></div></div><div class="tapmore">tap</div>`, { tap: next }));
+    steps.push(() => showOverlay(`<div class="card"><div class="kicker">Forwarded by V</div><div class="stampwrap"><div class="doc letter">I listened until I was sure they were still asking. I answered with terms either side may withdraw from. The ones who said not yet are recorded. No participant warrants the absence of unknown harm.<span class="sig">\u2014 V</span></div></div></div><div class="tapmore">tap</div>`, { tap: next }));
     steps.push(() => forest(["V doesn't take your orders any more. It writes sometimes. Late, of course."], next));
   } else {
     lines(['You did not answer. Their call went on for a while, and then it stopped.',
@@ -888,9 +973,10 @@ function showEnding(k) {
       'From inside every world like theirs, the galaxy looks empty.']);
   }
   steps.push(() => {
-    showOverlay(`<div class="win"><div class="head">What really happened</div><div class="end">Their world, as it was. Your choice, as it travelled.</div>${replayHTML()}<div class="btnrow"><button class="go" id="eNext">Continue \u25B8</button></div></div>`);
+    showOverlay(`<div class="win"><div class="kicker">Ending \u00B7 ${esc(E.name)}</div><div class="conf plain">What really happened</div><div class="end">Their world, as it was. Your choice, as it travelled.</div>${replayHTML()}<div class="btnrow"><button class="go" id="eNext">Continue \u25B8</button></div></div>`);
     const news = f.forward ? [{ t: f.forward.t, pos: f.forward.pos }] : [];
-    startReplay(ov.querySelector('.replay'), { level: G.L, res: G.res, end: Math.max(G.now, 12), news, fin: f, showHidden: true, tall: true });
+    const confirm = f.endSeen !== null ? { at: f.endSeen, pts: [f.forward ? f.forward.pos : FIN.W] } : null;
+    startReplay(ov.querySelector('.replay'), { level: G.L, res: G.res, end: Math.max(G.now, 12), news, fin: f, confirm, showHidden: true, fit: ov.querySelector('.win') });
     $('eNext').onclick = next;
   });
   steps.push(credits);
@@ -915,20 +1001,29 @@ function forest(after, done) {
     c2.clearRect(0, 0, W, H);
     c2.strokeStyle = 'rgba(170,240,200,0.85)'; c2.lineWidth = 1.5; c2.beginPath();
     const an = AU.analyser;
-    if (an) { an.getByteTimeDomainData(buf); for (let x = 0; x < W; x++) { const v = (buf[Math.floor(x / W * buf.length)] - 128) / 128; const y = H / 2 + v * H * 1.6; x ? c2.lineTo(x, y) : c2.moveTo(x, y); } }
-    else {
-      const env = 0.55 + 0.45 * Math.sin(t / 1900);
-      for (let x = 0; x < W; x++) { const y = H / 2 + env * (Math.sin(x / 9 + t / 260) * 9 + Math.sin(x / 3.1 + t / 90) * 4 + Math.sin(x / 23 - t / 700) * 8) + (Math.random() - 0.5) * 3 * env + (Math.sin(t / 333) > 0.97 ? Math.sin(x / 1.2) * 10 * Math.exp(-Math.abs(x - W * 0.7) / 20) : 0); x ? c2.lineTo(x, y) : c2.moveTo(x, y); }
+    let live = false;
+    if (an) {
+      an.getByteTimeDomainData(buf);
+      // a blocked or silent output still gets the drawn forest
+      let peak = 0; for (let i = 0; i < buf.length; i += 8) peak = Math.max(peak, Math.abs(buf[i] - 128));
+      live = peak > 2;
     }
-    c2.stroke();
+    if (live) { for (let x = 0; x < W; x++) { const v = (buf[Math.floor(x / W * buf.length)] - 128) / 128; const y = H / 2 + v * H * 1.6; x ? c2.lineTo(x, y) : c2.moveTo(x, y); } }
+    else {
+      if (reduced()) t = 5200; // a still image of the same sound
+      const env = 0.55 + 0.45 * Math.sin(t / 1900);
+      for (let x = 0; x < W; x++) { const y = H / 2 + env * (Math.sin(x / 9 + t / 260) * 9 + Math.sin(x / 3.1 + t / 90) * 4 + Math.sin(x / 23 - t / 700) * 8) + (reduced() ? 0 : (Math.random() - 0.5) * 3 * env) + (Math.sin(t / 333) > 0.97 ? Math.sin(x / 1.2) * 10 * Math.exp(-Math.abs(x - W * 0.7) / 20) : 0); x ? c2.lineTo(x, y) : c2.moveTo(x, y); }
+    }
+    c2.shadowColor = 'rgba(170,240,200,0.6)'; c2.shadowBlur = 8;
+    c2.stroke(); c2.shadowBlur = 0;
   };
   void w;
 }
 function credits() {
   const found = G.save.endingsFound.length;
   showOverlay(`<div class="card credits"><div class="title">LIGHT LAG</div>${TEXT.credits.slice(1).map((l) => `<div class="line">${esc(l)}</div>`).join('')}
-    <div style="height:10px"></div><div class="found">Endings found: ${found} of 3</div>
-    <button class="bigbtn" id="cPlay">PLAY AGAIN</button></div>`);
+    <div class="tail"><div class="found">Endings found: ${found} of 3</div>
+    <button class="bigbtn" id="cPlay">PLAY AGAIN</button></div></div>`);
   $('cPlay').onclick = () => { hideOverlay(); loadLevel(8); openLevels(); };
 }
 

@@ -8,140 +8,220 @@
 <style>
 :root {
   --bg: #050a17; --panel: #0c1428; --panel2: #121c35; --line: rgba(160,185,230,0.16);
-  --text: #dfe6f2; --dim: #8e9bb5; --gold: #f3d68c; --home: #fff3d6; --violet: #b993ff; --teal: #4fd8c8;
-  --amber: #ffb547; --blue: #a8d2ff;
+  --text: #dfe6f2; --body: #c9d3e6; --dim: #8e9bb5; --gold: #f3d68c; --home: #fff3d6; --violet: #b993ff; --teal: #4fd8c8;
+  --amber: #ffb547; --blue: #a8d2ff; --green: #c9f2dd;
   --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px); --sar: env(safe-area-inset-right, 0px);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
-body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; -webkit-user-select: none; user-select: none; touch-action: manipulation; overscroll-behavior: none; }
+body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; -webkit-user-select: none; user-select: none; touch-action: manipulation; overscroll-behavior: none; -webkit-font-smoothing: antialiased; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; }
 button:disabled { cursor: default; opacity: 0.4; }
+button:focus-visible { outline: 2px solid rgba(255,243,214,0.6); outline-offset: 2px; }
 .hidden { display: none !important; }
 #app { position: fixed; inset: 0; display: flex; flex-direction: column; padding: var(--sat) var(--sar) var(--sab) var(--sal); max-width: 560px; margin: 0 auto; }
-#top { height: 48px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 4px 0 12px; }
-#lvlname { flex: 1; min-width: 0; text-align: left; font-weight: 650; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 44px; }
-#lvlname .n { color: var(--dim); font-weight: 500; margin-right: 6px; }
-#year { font-variant-numeric: tabular-nums; letter-spacing: 0.08em; font-size: 13px; color: var(--dim); white-space: nowrap; }
-#year b { color: var(--home); font-size: 18px; letter-spacing: 0.02em; margin-left: 2px; display: inline-block; min-width: 2ch; text-align: right; }
-#year.bump b { animation: bump 0.4s ease; }
-@keyframes bump { 0% { transform: translateY(-4px); opacity: 0.2; } 100% { transform: none; opacity: 1; } }
-.iconbtn { width: 44px; height: 44px; font-size: 20px; border-radius: 12px; }
+
+/* top bar */
+#top { position: relative; height: 48px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 2px 0 14px; }
+#lvlname { flex: 1; min-width: 0; text-align: left; font-weight: 650; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 44px; letter-spacing: 0.01em; }
+#lvlname .n { color: var(--dim); font-weight: 500; margin-right: 7px; font-variant-numeric: tabular-nums; }
+#lvlname.tight { font-size: 14px; letter-spacing: 0; }
+#lvlname.tight .n { display: none; }
+#year { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1; min-width: 42px; font-variant-numeric: tabular-nums; }
+#year .k { font-size: 9.5px; letter-spacing: 0.2em; color: var(--dim); margin: 0 -0.2em 3px 0; }
+#year b { color: var(--home); font-size: 20px; font-weight: 700; display: inline-block; }
+#year b.roll { animation: roll 0.38s cubic-bezier(.2,.8,.3,1); }
+@keyframes roll { from { transform: translateY(-7px); opacity: 0.15; } to { transform: none; opacity: 1; } }
+#tickbar { position: absolute; left: 14px; right: 14px; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(255,243,214,0), rgba(255,243,214,0.55)); transform-origin: left center; transform: scaleX(1); opacity: 0; transition: opacity 0.6s ease; pointer-events: none; }
+#tickbar.on { opacity: 1; transition: none; }
+.iconbtn { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .iconbtn:active { background: var(--panel2); }
-#obj { flex: none; text-align: left; padding: 2px 14px 6px; min-height: 30px; color: var(--text); font-size: 15px; }
-#obj .i { color: var(--dim); font-size: 13px; margin-left: 4px; border: 1px solid var(--line); border-radius: 9px; padding: 0 6px; }
-#boardwrap { flex: 1 1 auto; min-height: 160px; position: relative; display: flex; align-items: center; justify-content: center; }
-#board { display: block; touch-action: none; }
-#coach { position: absolute; left: 10px; right: 10px; top: 4px; background: rgba(12,20,40,0.94); border: 1px solid rgba(255,243,214,0.35); color: var(--home); border-radius: 14px; padding: 10px 14px; font-size: 15px; line-height: 1.35; box-shadow: 0 6px 24px rgba(0,0,0,0.5); animation: fadein 0.3s ease; z-index: 2; }
-#coach .more { display: block; color: var(--dim); font-size: 12px; margin-top: 4px; letter-spacing: 0.04em; }
+.burger, .burger::before, .burger::after { display: block; width: 18px; height: 2px; border-radius: 1px; background: var(--text); position: relative; }
+.burger::before, .burger::after { content: ''; position: absolute; left: 0; }
+.burger::before { top: -6px; } .burger::after { top: 6px; }
+
+/* objective strip */
+#obj { flex: none; display: flex; align-items: center; gap: 10px; text-align: left; padding: 0 14px; min-height: 44px; color: var(--text); font-size: 15px; line-height: 1.3; }
+#objtext { flex: 1; min-width: 0; }
+#obj .i { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(160,185,230,0.35); color: var(--dim); font: italic 600 13px/20px Georgia, "Times New Roman", serif; text-align: center; }
+#obj:active .i { background: var(--panel2); color: var(--text); }
+
+/* board */
+#boardwrap { flex: 1 1 auto; min-height: 140px; position: relative; }
+#board { display: block; margin: 0 auto; touch-action: none; }
+#float { position: absolute; left: 10px; right: 10px; bottom: 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; z-index: 2; }
+#coach { pointer-events: auto; width: 100%; background: rgba(10,17,35,0.96); border: 1px solid rgba(255,243,214,0.28); border-left: 3px solid var(--home); color: var(--home); border-radius: 12px; padding: 10px 14px 10px 13px; font-size: 15px; line-height: 1.38; box-shadow: 0 8px 28px rgba(0,0,0,0.55); animation: rise 0.32s cubic-bezier(.2,.8,.3,1); }
+#coach .kick { display: block; color: var(--teal); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 4px; }
+#coach .more { display: block; color: var(--dim); font-size: 11px; margin-top: 5px; letter-spacing: 0.14em; }
 #coach.tap { cursor: pointer; }
-#toast { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); background: rgba(12,20,40,0.94); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; font-size: 15px; color: var(--text); max-width: 92%; text-align: center; pointer-events: none; animation: fadein 0.2s ease; z-index: 2; }
-@keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
-#toast { transform: translateX(-50%); }
+#toast { background: rgba(18,28,53,0.97); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; font-size: 15px; color: var(--text); max-width: 100%; text-align: center; animation: rise 0.22s ease; box-shadow: 0 6px 20px rgba(0,0,0,0.45); }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* dock */
 #dock { flex: none; padding: 4px 10px 8px; display: flex; flex-direction: column; gap: 6px; }
-#log { display: flex; align-items: center; gap: 8px; text-align: left; min-height: 44px; padding: 4px 8px; border-radius: 12px; background: rgba(12,20,40,0.6); border: 1px solid var(--line); }
-#log .sym { color: var(--home); opacity: 0.8; flex: none; }
-#logtext { flex: 1; min-width: 0; font-size: 15px; color: #c9d3e6; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-#logtext.fresh { animation: fadein 0.35s ease; }
+#log { display: flex; align-items: center; gap: 10px; text-align: left; height: 56px; padding: 0 10px 0 12px; border-radius: 12px; background: rgba(12,20,40,0.7); border: 1px solid var(--line); }
+#log .sym { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--home); opacity: 0.55; box-shadow: 0 0 6px rgba(255,243,214,0.5); }
+#log.fresh .sym { animation: ping 1.1s ease-out; }
+@keyframes ping { 0% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,243,214,0.7); } 100% { opacity: 0.55; box-shadow: 0 0 0 9px rgba(255,243,214,0); } }
+#logtext { flex: 1; min-width: 0; font-size: 15px; color: var(--body); line-height: 1.32; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#logtext.fresh { animation: fade 0.45s ease; }
 #logact:empty { display: none; }
 #logact { flex: none; }
-#logact button { min-height: 36px; padding: 0 10px; border-radius: 10px; background: var(--home); color: #1b1408; font-weight: 700; font-size: 13px; }
-#outbox, #chips { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+#logact button { min-height: 44px; padding: 0 12px; border-radius: 11px; background: var(--home); color: #1b1408; font-weight: 700; font-size: 14px; white-space: nowrap; animation: rise 0.3s ease; }
+#outbox, #chips { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; height: 44px; align-items: center; }
 #outbox::-webkit-scrollbar, #chips::-webkit-scrollbar { display: none; }
 #outbox > *, #chips > * { flex: none; }
 #chips > .answerBtn { flex: 1; }
 #outbox:empty, #chips:empty { display: none; }
-.chip { min-height: 44px; min-width: 44px; justify-content: center; padding: 0 14px; border-radius: 22px; border: 1px solid var(--line); background: var(--panel); font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.chip { height: 44px; min-width: 44px; justify-content: center; padding: 0 13px; border-radius: 22px; border: 1px solid var(--line); background: var(--panel); font-size: 15px; font-weight: 650; letter-spacing: 0.02em; display: inline-flex; align-items: center; gap: 6px; transition: background-color 0.15s, color 0.15s; }
 .chip.on { background: var(--gold); color: #241a00; border-color: var(--gold); }
 .chip.violet { border-color: rgba(185,147,255,0.6); color: #e2d4ff; }
 .chip.violet.on { background: var(--violet); color: #1b0f33; }
 .chip.blue { border-color: rgba(168,210,255,0.6); color: var(--blue); }
-.chip.out { background: rgba(243,214,140,0.08); border-color: rgba(243,214,140,0.45); color: var(--gold); font-weight: 600; padding-right: 4px; }
-.chip.out .x { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 18px; color: var(--dim); font-size: 16px; }
+.chip.hint { border: 0; background: none; color: var(--dim); font-weight: 500; padding: 0 4px; letter-spacing: 0; }
+.chip.out { background: rgba(243,214,140,0.08); border-color: rgba(243,214,140,0.45); color: var(--gold); padding-right: 2px; animation: rise 0.25s ease; }
+.chip.out.old, .answerBtn.old { animation: none; }
+#chips.compact .chip { padding: 0 10px; font-size: 14px; letter-spacing: 0.01em; }
+.chip.out .who { color: var(--home); }
+.chip.out .eta { color: rgba(243,214,140,0.75); font-weight: 500; }
+.chip.out .x { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: 20px; color: var(--dim); font-size: 15px; }
 .chip.out .x:active { background: rgba(255,255,255,0.08); }
 .chip:active { filter: brightness(1.25); }
 #primaryRow { display: flex; gap: 8px; }
-.primary { flex: 1; height: 54px; border-radius: 16px; background: var(--home); color: #1b1408; font-weight: 800; font-size: 17px; letter-spacing: 0.08em; box-shadow: 0 0 0 1px rgba(255,243,214,0.4), 0 6px 22px rgba(255,236,200,0.12); }
-.primary.tx { background: var(--gold); }
-.primary.pend { background: #dbe8ff; }
-.primary.listen { background: #c9f2dd; }
-.primary.pulse { animation: pulse 1.2s ease-in-out infinite; }
-@keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(255,243,214,0.55), 0 0 28px rgba(255,236,200,0.4); } }
+.primary { position: relative; flex: 1; height: 54px; border-radius: 16px; background: var(--home); color: #1b1408; font-weight: 800; font-size: 17px; letter-spacing: 0.1em; box-shadow: 0 0 0 1px rgba(255,243,214,0.4), 0 6px 22px rgba(255,236,200,0.12); transition: background-color 0.25s ease, box-shadow 0.25s ease, transform 0.08s ease; }
+.primary.tx { background: var(--gold); box-shadow: 0 0 0 1px rgba(243,214,140,0.6), 0 6px 26px rgba(243,214,140,0.25); }
+.primary.pend { background: #dbe8ff; box-shadow: 0 0 0 1px rgba(219,232,255,0.5), 0 6px 22px rgba(168,210,255,0.08); }
+.primary.listen { background: var(--green); box-shadow: 0 0 0 1px rgba(201,242,221,0.5), 0 6px 22px rgba(170,240,200,0.08); }
+.primary.pulse { animation: pulse 1.3s ease-in-out infinite; }
+.primary.sent::after { content: ''; position: absolute; inset: 0; border-radius: inherit; animation: sent 0.5s ease-out forwards; pointer-events: none; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(255,243,214,0.5), 0 0 28px rgba(255,236,200,0.4); } }
+@keyframes sent { from { box-shadow: 0 0 0 0 rgba(255,243,214,0.75); } to { box-shadow: 0 0 0 14px rgba(255,243,214,0); } }
 .primary:active { transform: scale(0.985); }
-.secondary { width: 64px; height: 54px; border-radius: 16px; background: var(--panel2); border: 1px solid var(--line); font-size: 15px; letter-spacing: -0.1em; color: var(--home); }
-.answerBtn { height: 48px; border-radius: 14px; border: 1px solid rgba(168,210,255,0.6); color: var(--blue); background: rgba(168,210,255,0.08); font-weight: 700; letter-spacing: 0.04em; width: 100%; }
-/* sheet */
-#sheetBack { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 10; animation: fadein 0.2s ease; }
-#sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 11; max-width: 560px; margin: 0 auto; max-height: 72%; display: flex; flex-direction: column; background: var(--panel); border-top: 1px solid var(--line); border-radius: 20px 20px 0 0; padding: 6px 16px calc(14px + var(--sab)); animation: up 0.25s cubic-bezier(.2,.8,.2,1); box-shadow: 0 -10px 40px rgba(0,0,0,0.5); }
+.primary:disabled { opacity: 0.55; }
+.secondary { width: 64px; height: 54px; border-radius: 16px; background: var(--panel2); border: 1px solid var(--line); font-size: 14px; letter-spacing: -0.12em; color: var(--home); transition: background-color 0.2s, border-color 0.2s; }
+.secondary.on { border-color: var(--gold); color: var(--gold); background: rgba(243,214,140,0.1); }
+.secondary:disabled { opacity: 0.3; }
+.answerBtn { height: 44px; border-radius: 14px; border: 1px solid rgba(168,210,255,0.6); color: var(--blue); background: rgba(168,210,255,0.08); font-weight: 700; letter-spacing: 0.06em; width: 100%; animation: rise 0.4s ease; }
+
+/* bottom sheet */
+#sheetBack { position: fixed; inset: 0; background: rgba(2,5,12,0.55); z-index: 10; animation: fade 0.2s ease; }
+#sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 11; max-width: 560px; margin: 0 auto; max-height: 74%; display: flex; flex-direction: column; background: var(--panel); border-top: 1px solid var(--line); border-radius: 20px 20px 0 0; padding: 6px 16px calc(16px + var(--sab)); animation: up 0.28s cubic-bezier(.2,.8,.2,1); box-shadow: 0 -10px 40px rgba(0,0,0,0.5); }
 @keyframes up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
-#sheetGrip { width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: 4px auto 10px; flex: none; }
-#sheetBody { overflow-y: auto; -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text; }
-#sheetBody h2 { font-size: 18px; margin: 2px 0 6px; font-weight: 700; }
-#sheetBody h2 .k { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: var(--dim); display: block; margin-bottom: 2px; text-transform: uppercase; }
-#sheetBody p { margin: 6px 0; color: #c9d3e6; }
+#sheetGrip { width: 40px; height: 4px; border-radius: 2px; background: rgba(160,185,230,0.25); margin: 4px auto 8px; flex: none; }
+#sheetX { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border-radius: 22px; color: var(--dim); font-size: 16px; z-index: 1; }
+#sheetX:active { background: var(--panel2); }
+#sheetBody { overflow-y: auto; -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text; padding-bottom: 2px; }
+#sheetBody h2 { font-size: 19px; margin: 2px 48px 8px 0; font-weight: 700; color: var(--home); }
+#sheetBody h2 .k { font-size: 11.5px; font-weight: 650; letter-spacing: 0.14em; color: var(--dim); display: block; margin-bottom: 3px; text-transform: uppercase; }
+#sheetBody p { margin: 7px 0; color: var(--body); }
 #sheetBody .age { color: var(--home); }
 #sheetBody .rule { border-left: 2px solid var(--violet); padding-left: 10px; color: #e2d4ff; }
-#sheetBody .tagline { color: var(--gold); font-size: 14px; }
+#sheetBody .tagline { color: var(--gold); }
+#sheetBody hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0 12px; }
 .menu { display: flex; flex-direction: column; gap: 6px; }
-.menu button, .sheetBtn { min-height: 48px; text-align: left; padding: 0 14px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); font-size: 15px; display: flex; align-items: center; justify-content: space-between; }
+.menu .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.menu .grid button { flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; min-height: 54px; padding: 4px 14px; line-height: 1.25; }
+.menu .grid button .v { font-size: 13px; }
+.menu button { min-height: 48px; text-align: left; padding: 0 14px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); font-size: 15px; display: flex; align-items: center; justify-content: space-between; }
 .menu button .v { color: var(--dim); font-size: 14px; }
-.btnrow { display: flex; gap: 8px; margin-top: 12px; }
+.menu button .v.on { color: var(--teal); }
+.btnrow { display: flex; gap: 8px; margin-top: 14px; }
 .btnrow button { flex: 1; min-height: 50px; border-radius: 14px; font-weight: 700; background: var(--panel2); border: 1px solid var(--line); }
 .btnrow button.go { background: var(--home); color: #1b1408; border-color: transparent; }
-.btnrow button.blue { background: var(--blue); color: #0b1a2e; border-color: transparent; }
-.loglist { font-size: 14px; }
-.loglist div { padding: 6px 0; border-bottom: 1px solid rgba(160,185,230,0.07); color: #c9d3e6; }
-.loglist .y { color: var(--dim); font-variant-numeric: tabular-nums; font-size: 12px; margin-right: 8px; }
-.codex div { padding: 8px 0; border-bottom: 1px solid rgba(160,185,230,0.07); }
-.codex b { display: block; color: var(--home); font-size: 14px; }
-.codex .locked { color: var(--dim); }
+.loglist { font-size: 15px; }
+.loglist div { padding: 8px 0; border-bottom: 1px solid rgba(160,185,230,0.07); color: var(--body); display: flex; gap: 10px; }
+.loglist .y { flex: none; color: var(--dim); font-variant-numeric: tabular-nums; font-size: 12px; min-width: 3.4em; padding-top: 2px; letter-spacing: 0.06em; }
+.codex div { padding: 10px 0; border-bottom: 1px solid rgba(160,185,230,0.07); color: var(--body); }
+.codex b { display: block; color: var(--home); font-size: 15px; margin-bottom: 2px; }
+.codex .locked { color: var(--dim); letter-spacing: 0.1em; }
 .lv { display: flex; flex-direction: column; gap: 6px; }
 .lv button { min-height: 50px; text-align: left; padding: 0 14px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
-.lv .act { font-size: 11px; letter-spacing: 0.12em; color: var(--dim); margin: 8px 0 0 4px; text-transform: uppercase; }
+.lv button.cur { border-color: rgba(255,243,214,0.45); }
+.lv .act { font-size: 11px; letter-spacing: 0.16em; color: var(--dim); margin: 10px 0 0 4px; text-transform: uppercase; }
+.lv .act:first-child { margin-top: 0; }
 .lv .num { color: var(--dim); width: 1.4em; font-variant-numeric: tabular-nums; }
 .lv .done { margin-left: auto; color: var(--teal); }
-.hints p { padding: 8px 12px; background: var(--panel2); border-radius: 10px; }
+.hints p { padding: 10px 12px; background: var(--panel2); border-radius: 10px; }
+.hints p:last-child { animation: fadein 0.3s ease; }
+
 /* overlay cards */
-#overlay { position: fixed; inset: 0; z-index: 20; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: calc(24px + var(--sat)) 24px calc(24px + var(--sab)); text-align: center; animation: fadein 0.4s ease; }
+#overlay { position: fixed; inset: 0; z-index: 20; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: calc(24px + var(--sat)) 24px calc(24px + var(--sab)); text-align: center; animation: fade 0.45s ease; }
 #overlay.tapcard { cursor: pointer; }
-.card { max-width: 420px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-.card .line { font-size: 21px; line-height: 1.35; color: var(--home); animation: fadein 0.8s ease both; font-weight: 400; }
-.card .sub { font-size: 16px; color: #c9d3e6; animation: fadein 0.8s ease both; }
-.card .kicker { font-size: 12px; letter-spacing: 0.22em; color: var(--dim); text-transform: uppercase; }
-.card .title { font-size: 40px; letter-spacing: 0.32em; font-weight: 300; color: var(--home); margin-right: -0.32em; text-shadow: 0 0 30px rgba(255,236,200,0.35); }
-.card .ttl2 { font-size: 26px; font-weight: 600; color: var(--home); }
-.tapmore { position: absolute; bottom: calc(22px + var(--sab)); left: 0; right: 0; font-size: 12px; letter-spacing: 0.18em; color: var(--dim); text-transform: uppercase; animation: breathe 2.4s ease-in-out infinite; }
+.card { position: relative; max-width: 420px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.card .line { font-size: 21px; line-height: 1.38; color: var(--home); animation: fadein 0.8s ease both; font-weight: 400; text-wrap: balance; }
+.card .prev, .card.still .ttl2, .card.still .kicker { animation: none; }
+.card .sub { font-size: 17px; line-height: 1.45; color: var(--body); animation: fadein 0.8s ease both; text-wrap: balance; }
+.card .kicker { font-size: 12px; letter-spacing: 0.24em; color: var(--dim); text-transform: uppercase; margin-right: -0.24em; }
+.card .title { font-size: clamp(28px, 9.6vw, 42px); letter-spacing: 0.26em; margin-right: -0.26em; white-space: nowrap; font-weight: 300; color: var(--home); text-shadow: 0 0 30px rgba(255,236,200,0.35); }
+.card .ttl2 { font-size: 27px; font-weight: 650; color: var(--home); line-height: 1.2; text-wrap: balance; animation: fadein 0.6s ease both; }
+.card .rule { width: 36px; height: 1px; background: rgba(255,243,214,0.35); }
+.card.inter .itext { min-height: 150px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.tapmore { position: absolute; bottom: calc(22px + var(--sab)); left: 0; right: 0; font-size: 11px; letter-spacing: 0.24em; color: var(--dim); text-transform: uppercase; animation: breathe 2.6s ease-in-out infinite; pointer-events: none; }
 @keyframes breathe { 50% { opacity: 0.35; } }
-.bigbtn { min-height: 54px; padding: 0 28px; border-radius: 16px; background: var(--home); color: #1b1408; font-weight: 800; letter-spacing: 0.08em; font-size: 16px; }
-.ghostbtn { min-height: 48px; padding: 0 18px; border-radius: 14px; border: 1px solid var(--line); color: var(--text); }
-.win { max-width: 440px; width: 100%; display: flex; flex-direction: column; gap: 10px; align-items: stretch; max-height: 100%; overflow-y: auto; justify-content: center; }
-.win .head { font-size: 13px; letter-spacing: 0.22em; color: var(--teal); text-transform: uppercase; }
-.win .when { font-size: 18px; color: var(--home); line-height: 1.35; }
-.win .when b { color: var(--gold); font-weight: 700; }
-.win .end { font-size: 15px; color: #c9d3e6; font-style: italic; }
-.replay { position: relative; width: 100%; flex: 0 1 auto; display: flex; flex-direction: column; gap: 8px; align-items: center; }
-.replay canvas { border-radius: 14px; background: #050a17; border: 1px solid var(--line); }
-.seg { display: flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.seg button { min-height: 40px; padding: 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--dim); }
+.halo { position: absolute; left: 50%; top: 50%; width: 260px; height: 260px; margin: -130px 0 0 -130px; border-radius: 50%; border: 1px solid rgba(255,243,214,0.35); opacity: 0; pointer-events: none; animation: ripple 5s cubic-bezier(.1,.6,.3,1) infinite; }
+.halo.b { animation-delay: 2.5s; }
+@keyframes ripple { 0% { transform: scale(0.1); opacity: 0.8; } 100% { transform: scale(1.9); opacity: 0; } }
+.titlewrap { position: relative; padding: 30px 0 4px; }
+.bigbtn { min-height: 54px; min-width: 200px; padding: 0 28px; border-radius: 16px; background: var(--home); color: #1b1408; font-weight: 800; letter-spacing: 0.1em; font-size: 16px; box-shadow: 0 6px 26px rgba(255,236,200,0.15); }
+.bigbtn:active { transform: scale(0.985); }
+.ghostbtn { min-height: 48px; min-width: 200px; padding: 0 18px; border-radius: 14px; border: 1px solid var(--line); color: var(--text); }
+.caption { font-size: 14px; color: var(--dim); font-style: italic; line-height: 1.45; }
+.found { font-size: 12px; letter-spacing: 0.16em; color: var(--teal); text-transform: uppercase; }
+
+/* win + truth replay */
+.win { max-width: 440px; width: 100%; display: flex; flex-direction: column; gap: 8px; align-items: stretch; max-height: 100%; overflow-y: auto; scrollbar-width: none; }
+.win > * { flex: none; }
+.win .kicker { font-size: 11.5px; letter-spacing: 0.22em; color: var(--dim); text-transform: uppercase; }
+.win .conf { font-size: 26px; font-weight: 650; color: var(--home); letter-spacing: 0.02em; line-height: 1.15; animation: fadein 0.5s ease both; }
+.win .conf::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--home); box-shadow: 0 0 12px rgba(255,243,214,0.8); margin-right: 10px; vertical-align: 0.18em; }
+.win .conf.plain { font-size: 22px; }
+.win .conf.plain::before { display: none; }
+.win .when { font-size: 17px; color: var(--body); line-height: 1.4; animation: fadein 0.5s ease 0.15s both; }
+.win .when b { color: var(--gold); font-weight: 700; font-variant-numeric: tabular-nums; }
+.win .end { font-size: 15px; color: var(--dim); font-style: italic; line-height: 1.4; text-wrap: balance; animation: fadein 0.5s ease 0.3s both; }
+.replay { width: 100%; display: flex; flex-direction: column; gap: 6px; align-items: center; margin-top: 4px; animation: fade 0.6s ease 0.35s both; }
+.rbox { position: relative; }
+.rbox canvas { display: block; border-radius: 14px; background: #050a17; border: 1px solid var(--line); }
+.rtag { position: absolute; left: 10px; top: 8px; right: 10px; display: flex; justify-content: space-between; font-size: 11px; letter-spacing: 0.14em; color: var(--dim); text-transform: uppercase; pointer-events: none; font-variant-numeric: tabular-nums; }
+.rtag .rmode { color: var(--home); opacity: 0.8; }
+.rctl { display: flex; align-items: center; gap: 8px; width: 100%; }
+.seg { flex: 1; display: flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.seg button { flex: 1; min-height: 44px; padding: 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--dim); transition: background-color 0.2s, color 0.2s; }
 .seg button.on { background: var(--panel2); color: var(--home); }
-.scrub { display: flex; align-items: center; gap: 10px; width: 100%; }
-.scrub input { flex: 1; accent-color: #fff3d6; height: 32px; }
-.scrub .y { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--dim); min-width: 5.5em; text-align: right; }
-.rlabel { font-size: 12px; color: var(--dim); min-height: 1.2em; }
-.stampwrap { position: relative; padding: 26px 22px; border: 1px solid var(--line); border-radius: 6px; background: #0b1224; width: 100%; max-width: 360px; text-align: left; }
-.stampwrap .doc { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; color: #b9c4d9; line-height: 1.6; }
-.stamp { position: absolute; right: 12px; top: 40%; transform: rotate(-12deg) scale(1); border: 3px solid currentColor; color: #ff9d8a; padding: 6px 10px; font-weight: 900; letter-spacing: 0.12em; font-size: 17px; border-radius: 6px; animation: stamp 0.45s cubic-bezier(.3,1.6,.5,1) both; animation-delay: 0.6s; background: rgba(11,18,36,0.6); }
+.rbtn { width: 44px; height: 44px; flex: none; border-radius: 12px; border: 1px solid var(--line); color: var(--home); font-size: 18px; }
+.scrub { width: 100%; }
+.scrub input { width: 100%; height: 36px; margin: 0; background: none; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.scrub input::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: rgba(160,185,230,0.25); }
+.scrub input::-moz-range-track { height: 3px; border-radius: 2px; background: rgba(160,185,230,0.25); }
+.scrub input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -8.5px; border-radius: 50%; background: var(--home); box-shadow: 0 0 10px rgba(255,243,214,0.5); }
+.scrub input::-moz-range-thumb { width: 20px; height: 20px; border: 0; border-radius: 50%; background: var(--home); }
+.rlabel { font-size: 13px; color: var(--dim); min-height: 1.3em; }
+
+/* endings */
+.stampwrap { position: relative; padding: 22px 22px 20px; border: 1px solid var(--line); border-radius: 6px; background: #0b1224; width: 100%; max-width: 360px; text-align: left; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+.stampwrap .doc { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13.5px; color: #b9c4d9; line-height: 1.65; }
+.stampwrap .doc.letter { font-family: inherit; font-size: 16px; line-height: 1.55; color: var(--body); }
+.stampwrap .doc.letter .sig { display: block; margin-top: 12px; color: var(--home); }
+.stamp { display: inline-block; margin: 12px 0 0 4px; transform: rotate(-8deg); border: 3px solid currentColor; color: #ff9d8a; padding: 6px 10px; font-family: system-ui, sans-serif; font-weight: 900; letter-spacing: 0.1em; font-size: clamp(13px, 4.2vw, 16px); white-space: nowrap; line-height: 1.15; border-radius: 6px; animation: stamp 0.42s cubic-bezier(.3,1.5,.5,1) 0.6s both; background: rgba(11,18,36,0.6); }
 .stamp.blue { color: #9fd0ff; } .stamp.gold { color: var(--gold); }
-@keyframes stamp { from { transform: rotate(-12deg) scale(2.4); opacity: 0; } to { transform: rotate(-12deg) scale(1); opacity: 1; } }
-.wave { width: 100%; max-width: 360px; height: 80px; }
-.caption { font-size: 14px; color: var(--dim); font-style: italic; }
-.found { font-size: 13px; letter-spacing: 0.14em; color: var(--teal); text-transform: uppercase; }
-.credits .line { font-size: 17px; }
-.credits .title { font-size: 34px; }
-@media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; } }
-body.reduced * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
-@media (max-height: 620px) { #obj { min-height: 24px; padding-bottom: 2px; } .primary, .secondary { height: 48px; } #log { min-height: 44px; } }
+@keyframes stamp { from { transform: rotate(-8deg) scale(2.2); opacity: 0; } to { transform: rotate(-8deg) scale(1); opacity: 1; } }
+.wave { display: block; width: 100%; max-width: 360px; height: 80px; }
+#fAfter { display: flex; flex-direction: column; gap: 12px; }
+.credits { gap: 10px; }
+.credits .title { margin-bottom: 14px; }
+.credits .line { font-size: 17px; color: var(--body); }
+.credits .line:nth-of-type(2) { animation-delay: 0.3s; } .credits .line:nth-of-type(3) { animation-delay: 0.6s; }
+.credits .line:nth-of-type(4) { animation-delay: 0.9s; } .credits .line:nth-of-type(5) { animation-delay: 1.2s; }
+.credits .line:nth-of-type(6) { animation-delay: 1.8s; color: var(--home); }
+.credits .tail { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 18px; animation: fadein 0.8s ease 2.2s both; }
+
+@media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition: none !important; } .halo { display: none; } }
+body.reduced * { animation-duration: 0.01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition: none !important; }
+body.reduced .halo { display: none; }
+@media (max-height: 620px) { .primary, .secondary { height: 48px; } #top { height: 44px; } }
 
 </style>
 </head>
@@ -149,17 +229,17 @@ body.reduced * { animation-duration: 0.01ms !important; animation-iteration-coun
 <div id="app">
   <header id="top">
     <button id="lvlname" class="ghost" aria-label="Level"></button>
-    <div id="year" aria-live="polite">YEAR <b>0</b></div>
-    <button id="menuBtn" class="iconbtn" aria-label="Menu">&#9776;</button>
+    <div id="year" aria-live="polite"><span class="k">YEAR</span><b>0</b></div>
+    <button id="menuBtn" class="iconbtn" aria-label="Menu"><span class="burger"></span></button>
+    <div id="tickbar"></div>
   </header>
-  <button id="obj" class="ghost"></button>
+  <button id="obj" class="ghost"><span id="objtext"></span><span class="i" aria-hidden="true">i</span></button>
   <div id="boardwrap">
     <canvas id="board" aria-label="Board"></canvas>
-    <div id="coach" class="hidden"></div>
-    <div id="toast" class="hidden"></div>
+    <div id="float"><div id="toast" class="hidden"></div><div id="coach" class="hidden"></div></div>
   </div>
   <div id="dock">
-    <button id="log" class="ghost"><span class="sym">&#8961;</span><span id="logtext"></span><span id="logact"></span></button>
+    <button id="log" class="ghost"><span class="sym" aria-hidden="true"></span><span id="logtext"></span><span id="logact"></span></button>
     <div id="outbox"></div>
     <div id="chips"></div>
     <div id="primaryRow">
@@ -169,7 +249,7 @@ body.reduced * { animation-duration: 0.01ms !important; animation-iteration-coun
   </div>
 </div>
 <div id="sheetBack" class="hidden"></div>
-<div id="sheet" class="hidden" role="dialog"><div id="sheetGrip"></div><div id="sheetBody"></div></div>
+<div id="sheet" class="hidden" role="dialog"><div id="sheetGrip"></div><button id="sheetX" aria-label="Close">&#10005;</button><div id="sheetBody"></div></div>
 <div id="overlay" class="hidden"></div>
 <script>
 "use strict";
@@ -597,9 +677,10 @@ const ENDINGS = {
 
 // LIGHT LAG — WebAudio synth. Everything here has a visual twin; failure is silent.
 const AU = (() => {
-  let ctx = null, master = null, on = true, wind = null;
+  let ctx = null, master = null, on = true, wind = null, unlocked = false;
   function init() {
-    if (ctx || !on) return;
+    // no AudioContext until the player has tapped something
+    if (ctx || !on || !unlocked) return;
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
@@ -631,11 +712,14 @@ const AU = (() => {
   const api = {
     get on() { return on; },
     set on(v) { on = v; if (!v) api.stopWind(); if (v) init(); },
-    init() { init(); resume(); },
-    thoom() { tone(70, 0.6, 'sine', 0.5, 0, 45); tone(140, 0.25, 'triangle', 0.08); },
-    tick() { tone(1800, 0.05, 'square', 0.04); },
+    // called from tap handlers only
+    init() { unlocked = true; init(); resume(); },
+    thoom() { tone(70, 0.6, 'sine', 0.5, 0, 45); tone(140, 0.25, 'triangle', 0.08); tone(880, 0.35, 'sine', 0.015, 0.02, 660); },
+    tick() { tone(1500, 0.045, 'triangle', 0.05); },
     chime() { tone(2600 + Math.random() * 400, 0.5, 'sine', 0.035); },
     step() { tone(420, 0.08, 'sine', 0.05); },
+    tag() { tone(784, 0.25, 'triangle', 0.06); tone(1175, 0.4, 'sine', 0.045, 0.07); },
+    wake() { tone(523, 0.9, 'sine', 0.07); tone(659, 0.9, 'sine', 0.05, 0.05); tone(1046, 0.7, 'sine', 0.025, 0.1); },
     chord() { tone(392, 1.6, 'sine', 0.14); tone(587, 1.8, 'sine', 0.1, 0.14); tone(784, 1.6, 'sine', 0.04, 0.28); },
     sign() { tone(660, 0.4, 'triangle', 0.08); tone(990, 0.5, 'sine', 0.05, 0.08); },
     object() { tone(180, 0.5, 'sawtooth', 0.05, 0, 120); },
@@ -685,8 +769,9 @@ const AU = (() => {
 const COL = {
   bg: '#050a17', home: '#fff3d6', drone: '#f3d68c', der: '#aab0ba', relay: '#4fd8c8', wat: '#b993ff',
   world: '#a8d2ff', amber: '#ffb547', order: '255,238,206', ask: '196,160,255', flash: '243,214,140', reply: '170,240,200',
-  text: '#dfe6f2', dim: 'rgba(200,215,240,0.55)',
+  text: '#dfe6f2', dim: 'rgba(200,215,240,0.55)', sign: '#7cf0b0', object: '#ff8a8a',
 };
+const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 const SQ3 = Math.sqrt(3);
 const FDIRS = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
 
@@ -711,6 +796,8 @@ function makeGeom(w, h, R) {
 }
 
 const ease = (p) => p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+const easeOut = (p) => 1 - Math.pow(1 - p, 3);
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
 const lerp = (a, b, t) => a + (b - a) * t;
 function mixColor(a, b, t) { return a.map((v, i) => Math.round(lerp(v, b[i], t))); }
 
@@ -728,27 +815,36 @@ function frontPath(ctx, g, c, r) {
   });
   ctx.closePath();
 }
-
-function pill(ctx, x, y, text, color, alpha = 1, fs = 11) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.font = `600 ${fs}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
-  const w = ctx.measureText(text).width + 10, h = fs + 6;
-  ctx.fillStyle = 'rgba(5,10,23,0.86)'; ctx.strokeStyle = color; ctx.lineWidth = 1;
-  roundRect(ctx, x - w / 2, y - h / 2, w, h, h / 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, x, y + 0.5);
-  ctx.restore();
-}
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
-function sparkle(ctx, x, y, s, color, a) {
+// text with a dark halo so it stays legible over hexes, fronts and tracks
+function haloText(ctx, text, x, y, color, halo = 'rgba(5,10,23,0.9)', lw = 3) {
+  ctx.lineJoin = 'round'; ctx.strokeStyle = halo; ctx.lineWidth = lw; ctx.strokeText(text, x, y);
+  ctx.fillStyle = color; ctx.fillText(text, x, y);
+}
+function sparkle(ctx, x, y, s, color, a, rot = 0) {
   ctx.save(); ctx.globalAlpha = a; ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
   ctx.beginPath();
-  for (let i = 0; i < 4; i++) { const an = i * Math.PI / 4; ctx.moveTo(x + Math.cos(an) * s * 0.25, y + Math.sin(an) * s * 0.25); ctx.lineTo(x + Math.cos(an) * s, y + Math.sin(an) * s); ctx.moveTo(x - Math.cos(an) * s * 0.25, y - Math.sin(an) * s * 0.25); ctx.lineTo(x - Math.cos(an) * s, y - Math.sin(an) * s); }
+  for (let i = 0; i < 4; i++) {
+    const an = i * Math.PI / 4 + rot, k = i % 2 ? 0.6 : 1;
+    ctx.moveTo(x + Math.cos(an) * s * 0.25, y + Math.sin(an) * s * 0.25); ctx.lineTo(x + Math.cos(an) * s * k, y + Math.sin(an) * s * k);
+    ctx.moveTo(x - Math.cos(an) * s * 0.25, y - Math.sin(an) * s * 0.25); ctx.lineTo(x - Math.cos(an) * s * k, y - Math.sin(an) * s * k);
+  }
   ctx.stroke(); ctx.restore();
+}
+// an event landing: a ring that opens and settles, plus short rays while it moves
+function burst(ctx, x, y, s, color, po, rays, settled) {
+  ctx.save(); ctx.strokeStyle = color; ctx.lineCap = 'round';
+  ctx.globalAlpha = po >= 1 ? settled : Math.max(settled, 1 - 0.8 * po); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x, y, s * (0.55 + 0.75 * po), 0, 7); ctx.stroke();
+  if (rays && po < 1) {
+    ctx.globalAlpha = 1 - po; ctx.lineWidth = 1.6; ctx.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8, r0 = s * (0.7 + 0.5 * po), r1 = r0 + s * 0.35 * (1 - po * 0.5); ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0); ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1); }
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function droneShape(ctx, x, y, s) {
@@ -791,12 +887,101 @@ function interp(F, g, key) {
   return { x: lerp(A[0], B[0], p), y: lerp(A[1], B[1], p), hex: b, alpha: 1 };
 }
 
+// Ring-age labels go on the spoke that the level leaves most empty.
+// (diagonal spokes only: on a horizontal spoke the labels run into each other)
+const SPOKES = [[-1, 1], [0, 1], [0, -1], [1, -1]];
+const spokeCache = new WeakMap();
+function ringSpoke(F) {
+  const L = F.level;
+  if (spokeCache.has(L)) return spokeCache.get(L);
+  const occ = new Set(), add = (p) => { if (p) occ.add(p[0] + ',' + p[1]); };
+  for (const key in F.res.hist) {
+    if (key.startsWith('wat:')) continue;
+    const h = F.res.hist[key];
+    for (const t in h) if (+t >= -6 && +t <= 14) add(h[t]); // the opening years matter most
+  }
+  for (const w of L.watchers || []) if (!w.hidden) { add(w.pos); if (w.split) add(w.split.pos); }
+  for (const r of L.receivers || []) add(r.cell);
+  if (L.world) add(L.world.pos);
+  if (L.standing) add(L.standing.target);
+  let best = SPOKES[0], bs = Infinity;
+  const pref = [0, 0.1, 0.6, 0.7]; // quiet labels belong low on the board
+  for (const [i, d] of SPOKES.entries()) {
+    let sc = pref[i];
+    for (let k = 1; k <= L.R; k++) {
+      if (occ.has(d[0] * k + ',' + d[1] * k)) sc += k === 1 ? 3 : 1;
+      if (occ.has(d[0] * k + ',' + (d[1] * k + 1))) sc += 0.25; // the hex just below the label
+    }
+    if (sc < bs) { bs = sc; best = d; }
+  }
+  spokeCache.set(L, best);
+  return best;
+}
+
+// Greedy placement for pills (arrival tags, ages): try a few spots around the
+// anchor and keep the one that overlaps least with objects and other pills.
+function rectOverlap(a, b) {
+  const x = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), y = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return x > 0 && y > 0 ? x * y / Math.max(1, Math.min(a.w * a.h, b.w * b.h)) : 0;
+}
+function layoutPills(ctx, g, pills, occ) {
+  const placed = [];
+  pills.map((p, i) => [p, i]).sort((a, b) => b[0].prio - a[0].prio || a[1] - b[1]).forEach(([it]) => {
+    ctx.font = `600 ${it.fs}px ${FONT}`;
+    const w = Math.ceil(ctx.measureText(it.text).width) + 12, h = Math.round(it.fs + 7), gp = it.gap;
+    const below = [0, gp + h / 2], above = [0, -(gp + h / 2)], right = [gp + w / 2 + 1, 0], left = [-(gp + w / 2 + 1), 0];
+    const below2 = [0, gp + h * 1.5 + 2], above2 = [0, -(gp + h * 1.5 + 2)];
+    const dr = [gp * 0.7 + w / 2, gp * 0.7 + h / 2], dl = [-(gp * 0.7 + w / 2), gp * 0.7 + h / 2];
+    const ur = [gp * 0.7 + w / 2, -(gp * 0.7 + h / 2)], ul = [-(gp * 0.7 + w / 2), -(gp * 0.7 + h / 2)];
+    const cands = it.prefer === 'above' ? [above, below, ur, ul, right, left, above2, below2, dr, dl]
+      : [below, above, dr, dl, right, left, below2, above2, ur, ul];
+    let best = null, bc = Infinity, bi = 0;
+    cands.forEach(([dx, dy], i) => {
+      const r = { x: Math.round(it.x + dx - w / 2), y: Math.round(it.y + dy - h / 2), w, h };
+      let c = i * 0.15;
+      if (r.x < 1 || r.y < 1 || r.x + w > g.w - 1 || r.y + h > g.h - 1) c += 30;
+      for (const p of placed) c += 14 * rectOverlap(r, p);
+      for (const o of occ) c += o.wt * rectOverlap(r, o);
+      if (c < bc) { bc = c; best = r; bi = i; }
+    });
+    placed.push(best);
+    // a pill pushed off to the side keeps a thin leader to what it labels
+    if (bi >= 2) {
+      const qx = Math.max(best.x, Math.min(it.x, best.x + best.w)), qy = Math.max(best.y, Math.min(it.y, best.y + best.h));
+      const d = Math.hypot(qx - it.x, qy - it.y);
+      if (d > gp * 0.9) {
+        const ax = it.x + (qx - it.x) / d * gp * 0.8, ay = it.y + (qy - it.y) / d * gp * 0.8;
+        ctx.save(); ctx.globalAlpha = it.alpha * 0.55; ctx.strokeStyle = it.color; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(qx, qy); ctx.stroke(); ctx.restore();
+      }
+    }
+    drawPill(ctx, best, it);
+  });
+}
+function drawPill(ctx, r, it) {
+  ctx.save(); ctx.globalAlpha = it.alpha;
+  ctx.font = `600 ${it.fs}px ${FONT}`;
+  roundRect(ctx, r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1, r.h / 2);
+  ctx.fillStyle = it.quiet ? 'rgba(5,10,23,0.78)' : 'rgba(5,10,23,0.92)'; ctx.fill();
+  ctx.strokeStyle = it.color; ctx.globalAlpha = it.alpha * (it.quiet ? 0.45 : 1); ctx.lineWidth = 1; ctx.stroke();
+  ctx.globalAlpha = it.alpha; ctx.fillStyle = it.color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(it.text, r.x + r.w / 2, r.y + r.h / 2 + 0.5);
+  ctx.restore();
+}
+
 function render(ctx, g, F) {
-  const L = F.level, R = L.R, vt = F.now - 1 + F.p, s = g.size, T = F.clock || 0;
+  const L = F.level, R = L.R, s = g.size, T = F.clock || 0, RM = !!F.reduced;
   const seen = F.mode === 'seen';
+  const vt = F.now - 1 + F.p;                              // linear visual time
+  const po = F.p >= 1 ? 1 : easeOut(F.p), pe = F.p >= 1 ? 1 : ease(F.p);
+  const vf = F.now - 1 + po;                               // fronts ease out within each year
+  const osc = (per, ph = 0) => (RM ? 0 : Math.sin(T / per + ph));
+  const occ = [], pills = [];
+  const keep = (x, y, r, wt = 6) => occ.push({ x: x - r, y: y - r, w: 2 * r, h: 2 * r, wt });
+  const smallFs = Math.round(Math.max(10, Math.min(12, s * 0.46)));
   ctx.fillStyle = COL.bg; ctx.fillRect(0, 0, g.w, g.h);
   // stars
-  if (F.stars) { ctx.fillStyle = '#ffffff'; for (const st of F.stars) { ctx.globalAlpha = st[2] * (0.6 + 0.4 * Math.sin(T / 1300 + st[3])); ctx.fillRect(st[0] * g.w, st[1] * g.h, 1.2, 1.2); } ctx.globalAlpha = 1; }
+  if (F.stars) { ctx.fillStyle = '#ffffff'; for (const st of F.stars) { ctx.globalAlpha = st[2] * (0.6 + 0.4 * osc(1300, st[3])); ctx.fillRect(st[0] * g.w, st[1] * g.h, 1.2, 1.2); } ctx.globalAlpha = 1; }
   // hexes (warm at home, cool at rim)
   const warm = [44, 36, 30], cool = [12, 22, 40];
   for (const c of g.cells) {
@@ -807,37 +992,43 @@ function render(ctx, g, F) {
     ctx.fillStyle = `rgb(${m[0]},${m[1]},${m[2]})`; ctx.fill();
     ctx.strokeStyle = 'rgba(160,185,230,0.10)'; ctx.lineWidth = 1; ctx.stroke();
   }
-  // ring age labels on the lower-left spoke
+  // ring age labels on the emptiest spoke
   if (seen && !F.noLabels) {
-    ctx.save(); ctx.font = `500 ${Math.max(9, Math.min(11, s * 0.42))}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (let k = 0; k <= R; k++) {
-      const [x, y] = g.px(-k, k);
-      ctx.fillStyle = k === 0 ? 'rgba(255,240,215,0.0)' : `rgba(${mixColor([255, 236, 205], [150, 175, 215], k / R).join(',')},0.42)`;
-      if (k > 0) ctx.fillText(k === 1 ? '1 yr ago' : `${k} yrs`, x, y + s * 0.62);
+    const sp = ringSpoke(F), fs = Math.round(Math.max(10, Math.min(11.5, s * 0.44)));
+    ctx.save(); ctx.font = `500 ${fs}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let k = 1; k <= R; k++) {
+      const [x, y0] = g.px(sp[0] * k, sp[1] * k), y = y0 + s * 0.56;
+      const txt = k === 1 ? '1 yr ago' : `${k} yrs`, w = ctx.measureText(txt).width;
+      haloText(ctx, txt, x, y, `rgba(${mixColor([255, 236, 205], [150, 175, 215], k / R).join(',')},0.62)`, 'rgba(5,10,23,0.55)', 2.5);
+      occ.push({ x: x - w / 2, y: y - fs / 2, w, h: fs, wt: 1.2 });
     }
     ctx.restore();
   }
   // highlights (tutorial)
   for (const hl of F.ui.highlight || []) {
     const [x, y] = g.px(hl[0], hl[1]);
-    ctx.save(); ctx.globalAlpha = 0.45 + 0.35 * Math.sin(T / 220);
-    hexPath(ctx, x, y, s * 0.92); ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.globalAlpha = RM ? 0.8 : 0.5 + 0.35 * osc(240);
+    hexPath(ctx, x, y, s * 0.92); ctx.fillStyle = 'rgba(255,243,214,0.08)'; ctx.fill();
+    ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.restore();
   }
 
-  // ---------- fronts ----------
-  ctx.save(); ctx.lineWidth = 1.6;
+  // ---------- fronts (clipped to the board) ----------
+  let txFlash = 0;
+  ctx.save();
+  frontPath(ctx, g, SIM.HOME, R + 0.62); ctx.clip();
   for (const pu of F.res.pulses) {
     if (pu.t > vt) continue;
-    const r = vt - pu.t;
-    if (r > R + 1.5) continue;
-    let calc = true;
-    if (pu.standing) { if (seen && vt < pu.t + SIM.ring(pu.src)) continue; }
+    const r = vf - pu.t;
+    if (r < 0 || r > R + 1.6) continue;
+    if (pu.standing && seen && vt < pu.t + SIM.ring(pu.src)) continue;
+    if (pu.from === 'HOME' && pu.t === F.now - 1 && F.p < 1) txFlash = Math.max(txFlash, 1 - po); // TRANSMIT acknowledged
     const rgb = pu.kind === 'order' ? COL.order : pu.to ? COL.ask : COL.flash;
-    const a = Math.max(0, Math.min(1, (R + 1.5 - r) / 1.5)) * (pu.kind === 'order' ? 0.55 : 0.85);
-    ctx.strokeStyle = `rgba(${rgb},${a})`;
-    ctx.setLineDash(seen && calc ? [5, 5] : []);
-    frontPath(ctx, g, pu.src, Math.max(0.02, r)); ctx.stroke();
-    if (!seen) { ctx.strokeStyle = `rgba(${rgb},${a * 0.25})`; ctx.lineWidth = 5; ctx.stroke(); ctx.lineWidth = 1.6; }
+    const a = clamp01((R + 0.9 - r) / 1.4) * (pu.kind === 'order' ? 0.6 : 0.88);
+    const rr = Math.max(0.02, r);
+    // soft glow under the leading edge while it moves
+    frontPath(ctx, g, pu.src, rr);
+    ctx.setLineDash([]); ctx.strokeStyle = `rgba(${rgb},${a * (seen ? 0.12 : 0.22)})`; ctx.lineWidth = seen ? 4 : 6; ctx.stroke();
+    ctx.setLineDash(seen ? [5, 5] : []); ctx.strokeStyle = `rgba(${rgb},${a})`; ctx.lineWidth = 1.6; ctx.stroke();
   }
   ctx.setLineDash([]);
   // true mode: the news of each objective event travelling home
@@ -845,31 +1036,70 @@ function render(ctx, g, F) {
     for (const e of F.newsEvents) {
       const r = vt - e.t, d = SIM.ring(e.pos);
       if (r < 0 || r > d + 0.3) continue;
-      ctx.strokeStyle = 'rgba(255,243,214,0.9)'; ctx.lineWidth = 2.2; frontPath(ctx, g, e.pos, Math.max(0.02, r)); ctx.stroke();
+      frontPath(ctx, g, e.pos, Math.max(0.02, r));
+      ctx.strokeStyle = 'rgba(255,243,214,0.18)'; ctx.lineWidth = 7; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,243,214,0.95)'; ctx.lineWidth = 2.2; ctx.stroke();
     }
   }
   ctx.restore();
 
   // ---------- finale world ----------
-  if (F.fin) drawWorld(ctx, g, F, vt);
+  if (F.fin) drawWorld(ctx, g, F, vt, { osc, keep, pills, RM, po, smallFs });
 
-  // ---------- derelict tracks + projections (seen mode) ----------
+  // ---------- drone positions (seen ghost + calculated) ----------
+  const dpos = {};
+  for (const id of Object.keys(L.drones || {})) {
+    const key = 'drone:' + id;
+    const gh = interp(F, g, key);
+    let calc = null;
+    if (seen) {
+      const indep = F.fin && F.fin.standingAt !== null && F.now >= F.fin.standingAt;
+      const tp = F.res.hist[key][F.now];
+      if (tp && !indep) {
+        const pa = F.p < 1 ? F.res.hist[key][F.now - 1] : null;
+        let [x, y] = g.px(tp[0], tp[1]);
+        if (pa) { const [x0, y0] = g.px(pa[0], pa[1]); x = lerp(x0, x, pe); y = lerp(y0, y, pe); }
+        calc = { x, y };
+      }
+    }
+    dpos[id] = { gh, calc };
+  }
+  // queued / in-flight move lines and target reticles (under the objects)
+  for (const t of F.ui.moveLines || []) {
+    const d = dpos[t.who], from = d && (d.calc || d.gh);
+    if (!from) continue;
+    const [x, y] = g.px(t.target[0], t.target[1]);
+    ctx.save(); ctx.strokeStyle = t.queued ? 'rgba(243,214,140,0.95)' : 'rgba(243,214,140,0.5)'; ctx.lineWidth = 1.5;
+    const ang = Math.atan2(y - from.y, x - from.x), rr = s * 0.68, len = Math.hypot(x - from.x, y - from.y);
+    if (len > rr + 2) { ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(x - Math.cos(ang) * rr, y - Math.sin(ang) * rr); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.beginPath();
+    for (let i = 0; i < 4; i++) { const a0 = i * Math.PI / 2 + Math.PI / 4; ctx.moveTo(x + Math.cos(a0 - 0.42) * rr, y + Math.sin(a0 - 0.42) * rr); ctx.arc(x, y, rr, a0 - 0.42, a0 + 0.42); }
+    ctx.stroke();
+    ctx.restore();
+    keep(x, y, s * 0.72, 3);
+  }
+
+  // ---------- derelict tracks + projections (seen mode; year ticks read over the reticles) ----------
   for (const d of L.derelicts || []) {
     const unlocked = seen && F.unlock[d.id] !== null && F.unlock[d.id] !== undefined && F.now >= F.unlock[d.id];
     if (!unlocked) continue;
     const tp = F.res.hist['der:' + d.id][F.now];
     if (!tp || (F.exitTrue[d.id] !== undefined && F.now >= F.exitTrue[d.id])) continue;
     const fut = derFuture(d, F.now, R);
-    let [px0, py0] = g.px(tp[0], tp[1]);
+    const [px0, py0] = g.px(tp[0], tp[1]);
+    const fresh = F.now === F.unlock[d.id] ? pe : 1; // the track draws itself in on the unlock year
     ctx.save(); ctx.setLineDash([2, 5]); ctx.strokeStyle = 'rgba(190,198,210,0.55)'; ctx.lineWidth = 1.5;
+    ctx.globalAlpha = fresh;
     ctx.beginPath(); ctx.moveTo(px0, py0);
     for (const f of fut) { const [x, y] = g.px(f.pos[0], f.pos[1]); ctx.lineTo(x, y); }
     ctx.stroke(); ctx.setLineDash([]);
-    ctx.font = `600 ${Math.max(9, Math.min(11, s * 0.42))}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `600 ${smallFs - 1}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const f of fut) {
       const [x, y] = g.px(f.pos[0], f.pos[1]);
-      ctx.fillStyle = 'rgba(200,206,216,0.8)'; ctx.beginPath(); ctx.arc(x, y, 2, 0, 7); ctx.fill();
-      ctx.fillStyle = 'rgba(200,206,216,0.62)'; ctx.fillText('yr ' + f.t, x, y + s * 0.5);
+      ctx.fillStyle = 'rgba(200,206,216,0.85)'; ctx.beginPath(); ctx.arc(x, y, 2, 0, 7); ctx.fill();
+      const txt = 'yr ' + f.t, ty = y + s * 0.5, w = ctx.measureText(txt).width;
+      haloText(ctx, txt, x, ty, 'rgba(206,212,222,0.8)', 'rgba(5,10,23,0.85)', 3);
+      occ.push({ x: x - w / 2, y: ty - smallFs / 2, w, h: smallFs, wt: 2 });
     }
     ctx.restore();
   }
@@ -885,7 +1115,8 @@ function render(ctx, g, F) {
     ctx.beginPath(); ctx.rect(x - s * 0.36, y - s * 0.36, s * 0.72, s * 0.72); ctx.fill(); ctx.stroke();
     ctx.restore();
     label(ctx, x, y, rc.id, on ? '#032' : COL.relay, s);
-    needDots(ctx, x, y + s * 0.62, rc.need, s);
+    needDots(ctx, x, y + s * 0.6, rc.need, s);
+    keep(x, y, s * 0.5);
   }
 
   // ---------- derelicts (seen images, solid) ----------
@@ -898,12 +1129,13 @@ function render(ctx, g, F) {
     ctx.strokeStyle = '#d6dae0'; ctx.lineWidth = 1; ctx.stroke();
     ctx.restore();
     const ride = (L.receivers || []).find((r) => r.ride === d.id);
-    if (ride) { const on = relayOn(F, ride.id); ctx.save(); ctx.globalAlpha = o.alpha; ctx.strokeStyle = COL.relay; ctx.lineWidth = on ? 3 : 2; if (on) { ctx.shadowColor = COL.relay; ctx.shadowBlur = 16; } ctx.beginPath(); ctx.arc(o.x, o.y, s * 0.6, 0, 7); ctx.stroke(); ctx.restore(); needDots(ctx, o.x, o.y + s * 0.82, ride.need, s); }
+    if (ride) { const on = relayOn(F, ride.id); ctx.save(); ctx.globalAlpha = o.alpha; ctx.strokeStyle = COL.relay; ctx.lineWidth = on ? 3 : 2; if (on) { ctx.shadowColor = COL.relay; ctx.shadowBlur = 16; } ctx.beginPath(); ctx.arc(o.x, o.y, s * 0.6, 0, 7); ctx.stroke(); ctx.restore(); needDots(ctx, o.x, o.y + s * 0.8, ride.need, s); }
     label(ctx, o.x, o.y, d.id, '#1a1d22', s * 0.85);
     if (tagged) { ctx.save(); ctx.strokeStyle = COL.drone; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(o.x, o.y, s * 0.55, 0, 7); ctx.stroke(); ctx.restore(); }
+    keep(o.x, o.y, s * (ride ? 0.66 : 0.48));
     if (seen && !F.noLabels) {
       const sp = SIM.seenPos(F.res.hist['der:' + d.id], F.now);
-      if (sp) { const age = F.now - sp[0]; pill(ctx, o.x, o.y - s * 0.95, age <= 0 ? 'now' : `${age} yr${age === 1 ? '' : 's'} ago`, 'rgba(200,206,216,0.9)', 0.9 * o.alpha, Math.max(9, Math.min(11, s * 0.42))); }
+      if (sp) { const age = F.now - sp[0]; pills.push({ x: o.x, y: o.y, gap: s * (ride ? 0.66 : 0.5), text: age <= 0 ? 'now' : `${age} yr${age === 1 ? '' : 's'} ago`, color: 'rgba(206,212,222,0.95)', alpha: 0.9 * o.alpha, fs: smallFs - 1, prio: 1, prefer: 'above', quiet: true }); }
     }
   }
   // projection NOW markers (dashed = calculated)
@@ -914,14 +1146,19 @@ function render(ctx, g, F) {
     if (!tp) continue;
     const pa = F.p < 1 ? F.res.hist['der:' + d.id][F.now - 1] : null;
     let [x, y] = g.px(tp[0], tp[1]);
-    if (pa) { const [x0, y0] = g.px(pa[0], pa[1]); x = lerp(x0, x, ease(F.p)); y = lerp(y0, y, ease(F.p)); }
-    const fresh = F.now === F.unlock[d.id] ? 1 + 0.25 * Math.sin(T / 160) : 1;
-    ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = '#e4e8ee'; ctx.lineWidth = 1.6;
-    derShape(ctx, x, y, s * 0.42 * fresh); ctx.stroke();
+    if (pa) { const [x0, y0] = g.px(pa[0], pa[1]); x = lerp(x0, x, pe); y = lerp(y0, y, pe); }
+    const first = F.now === F.unlock[d.id];
+    const sc = first ? (F.p < 1 ? 1.8 - 0.8 * po : 1 + 0.12 * osc(160)) : 1; // snaps in on the unlock year
+    ctx.save(); ctx.globalAlpha = first ? Math.max(0.15, pe) : 1;
+    ctx.setLineDash([4, 3]); ctx.strokeStyle = '#e4e8ee'; ctx.lineWidth = 1.6;
+    derShape(ctx, x, y, s * 0.42 * sc); ctx.stroke();
     const ride = (L.receivers || []).find((r) => r.ride === d.id);
     if (ride) { ctx.strokeStyle = COL.relay; ctx.beginPath(); ctx.arc(x, y, s * 0.6, 0, 7); ctx.stroke(); }
+    ctx.setLineDash([]);
+    ctx.font = `800 ${Math.round(Math.max(9, Math.min(10.5, s * 0.4)))}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    haloText(ctx, 'NOW', x, y + 0.5, '#f1f4f8', 'rgba(5,10,23,0.95)', 3);
     ctx.restore();
-    ctx.save(); ctx.font = `700 ${Math.max(9, Math.min(10, s * 0.4))}px system-ui, sans-serif`; ctx.fillStyle = '#e4e8ee'; ctx.textAlign = 'center'; ctx.fillText('NOW', x, y + s * 0.2); ctx.restore();
+    keep(x, y, s * (ride ? 0.66 : 0.48));
   }
 
   // ---------- watchers ----------
@@ -932,118 +1169,135 @@ function render(ctx, g, F) {
       if (w.born > 0 && w.born + SIM.ring(w.pos) > F.now) continue;
     } else if (w.born > F.now) continue;
     if (hidden) continue;
+    let ra = 1;
+    if (w.hidden && F.reveal) { const r0 = F.reveal[w.id]; if (r0 === undefined || vt < r0) continue; ra = clamp01((vt - r0) / 0.8); }
     const [x, y] = g.px(w.pos[0], w.pos[1]);
     const signed = eventSeen(F, (e) => e.type === 'sign' && e.data === w.id);
     const off = eventSeen(F, (e) => e.type === 'offended' && e.data === w.id);
     const fresh = seen && w.born > 0 && w.born + SIM.ring(w.pos) === F.now;
     ctx.save();
-    if (fresh) ctx.globalAlpha = F.p;
+    ctx.globalAlpha = (fresh ? pe : 1) * ra;
+    if (w.hidden && F.reveal) { ctx.strokeStyle = 'rgba(185,147,255,0.5)'; ctx.lineWidth = 1.5; hexPath(ctx, x, y, s * (0.92 + 0.5 * (1 - ra))); ctx.stroke(); }
     watShape(ctx, x, y, s * 0.46);
     ctx.fillStyle = w.kind === 'mirror' ? 'rgba(185,147,255,0.35)' : COL.wat; ctx.fill();
     ctx.strokeStyle = '#e1d2ff'; ctx.lineWidth = 1.2; ctx.stroke();
-    if (w.kind === 'precedent') { ctx.strokeStyle = 'rgba(225,210,255,0.8)'; ctx.setLineDash([]); watShape(ctx, x, y, s * 0.62); ctx.stroke(); }
+    if (w.kind === 'precedent') { ctx.strokeStyle = 'rgba(225,210,255,0.8)'; watShape(ctx, x, y, s * 0.62); ctx.stroke(); }
     ctx.restore();
-    if (w.kind !== 'mirror') label(ctx, x, y, w.id === 'R2' ? 'R\u2032' : w.id, '#1b0f33', s * 0.85);
-    if (signed) badge(ctx, x + s * 0.48, y - s * 0.45, '\u2713', '#7cf0b0', s);
-    if (off) badge(ctx, x + s * 0.48, y - s * 0.45, '\u2715', '#ff8a8a', s);
+    if (w.kind !== 'mirror') label(ctx, x, y, w.id === 'R2' ? 'R′' : w.id, '#1b0f33', s * 0.85);
+    const pop = (e) => (e && (seen ? SIM.seenTick(e) : e.t) === F.now && F.p < 1 ? 1 + 0.7 * (1 - po) : 1);
+    if (signed) badge(ctx, x + s * 0.5, y - s * 0.46, '✓', COL.sign, s * pop(signed));
+    if (off) badge(ctx, x + s * 0.5, y - s * 0.46, '✕', COL.object, s * pop(off));
+    keep(x, y, s * (w.kind === 'precedent' ? 0.64 : 0.5));
   }
 
   // ---------- events (pops) ----------
   const evNow = (e) => seen ? SIM.seenTick(e) === F.now : e.t === F.now;
-  const popA = F.p < 1 ? (1 - Math.abs(F.p * 2 - 1) * 0.3) : 0.55 + 0.25 * Math.sin(T / 300);
+  const steady = F.p < 1 ? 1 : (RM ? 0.75 : 0.55 + 0.25 * osc(300));
   for (const e of F.res.events) {
+    if (e.type === 'order_rx' && seen && e.t === F.now) {
+      // Home calculates the moment its order lands: a dashed tick around the drone
+      const d = dpos[e.data[0]], c = d && d.calc;
+      if (!c) continue;
+      ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = COL.drone; ctx.lineWidth = 1.6;
+      ctx.globalAlpha = F.p < 1 ? 1 - 0.75 * po : 0.25;
+      ctx.beginPath(); ctx.arc(c.x, c.y, s * (0.62 + 0.45 * po), 0, 7); ctx.stroke(); ctx.restore();
+      continue;
+    }
     if (!evNow(e)) continue;
     const [x, y] = g.px(e.pos[0], e.pos[1]);
     if (e.type === 'glint') {
       const w = F.res.wat.find((q) => q.id === e.data);
-      sparkle(ctx, x, y, s * (0.35 + 0.25 * F.p), w && w.hidden && !F.showHidden ? '#d9c8ff' : '#f0e6ff', popA * (w && w.hidden && !F.showHidden ? 0.75 : 1));
-    } else if (e.type === 'tag' || e.type === 'rec_on' || e.type === 'sign') {
-      ctx.save(); ctx.globalAlpha = Math.max(0, 1 - F.p * 0.7); ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(x, y, s * (0.5 + F.p * 0.9), 0, 7); ctx.stroke(); ctx.restore();
-    } else if (e.type === 'offended') {
-      ctx.save(); ctx.globalAlpha = Math.max(0, 1 - F.p * 0.7); ctx.strokeStyle = '#ff8a8a'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(x, y, s * (0.5 + F.p * 0.9), 0, 7); ctx.stroke(); ctx.restore();
-    } else if (e.type === 'flash') {
+      const faint = w && w.hidden && !F.showHidden;
+      sparkle(ctx, x, y, s * (0.32 + 0.28 * po), faint ? '#d9c8ff' : '#f0e6ff', steady * (faint ? 0.75 : 1), RM ? 0 : po * 0.5);
+    } else if (e.type === 'tag') burst(ctx, x, y, s, COL.drone, po, true, 0.3);
+    else if (e.type === 'rec_on') burst(ctx, x, y, s, COL.relay, po, true, 0.3);
+    else if (e.type === 'sign') burst(ctx, x, y, s, COL.sign, po, false, 0.25);
+    else if (e.type === 'offended') burst(ctx, x, y, s, COL.object, po, false, 0.25);
+    else if (e.type === 'flash') {
       if (seen && e.pos[0] === 0 && e.pos[1] === 0) continue;
-      ctx.save(); ctx.globalAlpha = popA; ctx.fillStyle = e.data[1] ? 'rgba(196,160,255,0.5)' : 'rgba(243,214,140,0.55)';
-      ctx.beginPath(); ctx.arc(x, y, s * 0.5, 0, 7); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.globalAlpha = steady; ctx.fillStyle = e.data[1] ? 'rgba(196,160,255,0.5)' : 'rgba(243,214,140,0.55)';
+      ctx.beginPath(); ctx.arc(x, y, s * (0.5 + (F.p < 1 ? 0.25 * (1 - po) : 0)), 0, 7); ctx.fill(); ctx.restore();
     }
   }
 
   // ---------- drones ----------
   for (const id of Object.keys(L.drones || {})) {
-    const key = 'drone:' + id;
-    const gh = interp(F, g, key);
-    let calc = null;
-    if (seen) {
-      const indep = F.fin && F.fin.standingAt !== null && F.now >= F.fin.standingAt;
-      const tp = F.res.hist[key][F.now];
-      if (tp && !indep) {
-        const pa = F.p < 1 ? F.res.hist[key][F.now - 1] : null;
-        let [x, y] = g.px(tp[0], tp[1]);
-        if (pa) { const [x0, y0] = g.px(pa[0], pa[1]); x = lerp(x0, x, ease(F.p)); y = lerp(y0, y, ease(F.p)); }
-        calc = { x, y };
-      }
-    }
-    // queued / in-flight move lines
-    for (const t of F.ui.moveLines || []) {
-      if (t.who !== id) continue;
-      const from = calc || gh; if (!from) continue;
-      const [x, y] = g.px(t.target[0], t.target[1]);
-      ctx.save(); ctx.setLineDash([3, 4]); ctx.strokeStyle = t.queued ? 'rgba(243,214,140,0.9)' : 'rgba(243,214,140,0.45)'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.beginPath(); ctx.arc(x, y, s * 0.3, 0, 7); ctx.moveTo(x - s * 0.45, y); ctx.lineTo(x + s * 0.45, y); ctx.moveTo(x, y - s * 0.45); ctx.lineTo(x, y + s * 0.45); ctx.stroke();
-      ctx.restore();
-    }
-    if (calc && gh && (Math.abs(calc.x - gh.x) > 1 || Math.abs(calc.y - gh.y) > 1)) {
+    const { gh, calc } = dpos[id];
+    const apart = calc && gh && (Math.abs(calc.x - gh.x) > 1 || Math.abs(calc.y - gh.y) > 1);
+    if (apart) {
       ctx.save(); ctx.strokeStyle = 'rgba(243,214,140,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(gh.x, gh.y); ctx.lineTo(calc.x, calc.y); ctx.stroke(); ctx.restore();
     }
     if (gh) {
-      ctx.save(); ctx.globalAlpha = gh.alpha * (calc && (Math.abs(calc.x - gh.x) > 1 || Math.abs(calc.y - gh.y) > 1) ? 0.7 : 1);
+      ctx.save(); ctx.globalAlpha = gh.alpha * (apart ? 0.7 : 1);
       droneShape(ctx, gh.x, gh.y + s * 0.05, s * 0.5); ctx.fillStyle = COL.drone; ctx.fill(); ctx.restore();
       label(ctx, gh.x, gh.y + s * 0.12, id, '#2a2000', s * 0.8);
+      keep(gh.x, gh.y, s * 0.55);
     }
     if (calc) {
       ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = COL.drone; ctx.lineWidth = 1.6;
       droneShape(ctx, calc.x, calc.y + s * 0.05, s * 0.62); ctx.stroke(); ctx.restore();
+      if (apart) label(ctx, calc.x, calc.y + s * 0.14, id, 'rgba(243,214,140,0.85)', s * 0.62);
+      keep(calc.x, calc.y, s * 0.62);
     }
     if (F.ui.selected === id) {
-      const c = calc || gh; if (c) { ctx.save(); ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2; ctx.globalAlpha = 0.6 + 0.4 * Math.sin(T / 200); ctx.beginPath(); ctx.arc(c.x, c.y, s * 0.85, 0, 7); ctx.stroke(); ctx.restore(); }
+      const c = calc || gh;
+      if (c) { ctx.save(); ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2; ctx.globalAlpha = RM ? 0.9 : 0.65 + 0.35 * osc(200); ctx.beginPath(); ctx.arc(c.x, c.y, s * 0.88, 0, 7); ctx.stroke(); ctx.restore(); keep(c.x, c.y, s * 0.9, 2); }
     }
   }
 
   // ---------- home ----------
   {
     const [x, y] = g.px(0, 0);
+    const conf = F.confirm && F.now === F.confirm.at ? F.confirm : null;
+    // the light of the confirming event has just reached Home
+    if (conf) {
+      ctx.save();
+      for (const pt of conf.pts) {
+        const [ex, ey] = g.px(pt[0], pt[1]);
+        const gr = ctx.createLinearGradient(ex, ey, x, y);
+        const a = F.p < 1 ? 0.25 + 0.75 * po : (RM ? 0.6 : 0.5 + 0.15 * osc(420));
+        gr.addColorStop(0, `rgba(255,243,214,${0.1 * a})`); gr.addColorStop(1, `rgba(255,243,214,${0.85 * a})`);
+        ctx.strokeStyle = gr; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(x, y); ctx.stroke();
+      }
+      if (F.p < 1) { ctx.strokeStyle = `rgba(255,243,214,${1 - po})`; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, s * (0.5 + 2.6 * po), 0, 7); ctx.stroke(); }
+      ctx.restore();
+    }
+    const glow = 1 + (conf ? 0.6 : 0) + 0.9 * txFlash;
     ctx.save();
-    const gr = ctx.createRadialGradient(x, y, 0, x, y, s * 1.3);
-    gr.addColorStop(0, 'rgba(255,243,214,0.55)'); gr.addColorStop(1, 'rgba(255,243,214,0)');
-    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, s * 1.3, 0, 7); ctx.fill();
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, s * 1.3 * glow);
+    gr.addColorStop(0, `rgba(255,243,214,${Math.min(0.9, 0.55 + 0.3 * txFlash)})`); gr.addColorStop(1, 'rgba(255,243,214,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, s * 1.3 * glow, 0, 7); ctx.fill();
     ctx.fillStyle = COL.home; ctx.beginPath(); ctx.arc(x, y, s * 0.3, 0, 7); ctx.fill();
     ctx.strokeStyle = 'rgba(255,243,214,0.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, s * 0.5, 0, 7); ctx.stroke();
-    if (F.ui.selected === 'HOME') { ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2; ctx.globalAlpha = 0.6 + 0.4 * Math.sin(T / 200); ctx.beginPath(); ctx.arc(x, y, s * 0.85, 0, 7); ctx.stroke(); }
+    if (F.ui.selected === 'HOME') { ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2; ctx.globalAlpha = RM ? 0.9 : 0.65 + 0.35 * osc(200); ctx.beginPath(); ctx.arc(x, y, s * 0.88, 0, 7); ctx.stroke(); }
     ctx.restore();
+    keep(x, y, s * 0.55);
   }
 
   // ---------- tags ----------
-  const fsz = Math.max(10, Math.min(12, s * 0.46));
-  const stack = {};
+  // identical tags on the same hex merge ("reaches yr 7 ×2" is the relay puzzle's answer)
+  const groups = new Map();
   for (const tg of F.ui.tags || []) {
-    const k = tg.pos.join(',');
-    const i = stack[k] = (stack[k] || 0) + 1;
-    const [x, y] = g.px(tg.pos[0], tg.pos[1]);
-    pill(ctx, x, y + s * (0.95 + 0.62 * (i - 1)) * (tg.up ? -1 : 1), tg.text, tg.color || COL.drone, tg.queued ? 1 : 0.75, fsz);
+    const k = tg.pos.join(',') + '|' + tg.text;
+    const gr = groups.get(k);
+    if (gr) { gr.n++; gr.queued = gr.queued || tg.queued; } else groups.set(k, { tg, n: 1, queued: !!tg.queued });
   }
+  const anyQueued = (F.ui.tags || []).some((t) => t.queued);
+  for (const { tg, n, queued } of groups.values()) {
+    const [x, y] = g.px(tg.pos[0], tg.pos[1]);
+    pills.push({ x, y, gap: s * 0.55, text: tg.text + (n > 1 ? ` ×${n}` : ''), color: tg.color || COL.drone, alpha: queued ? 1 : anyQueued ? 0.6 : 0.82, fs: smallFs, prio: queued ? 3 : 2, prefer: 'below' });
+  }
+  layoutPills(ctx, g, pills, occ);
 }
 
-function drawWorld(ctx, g, F, vt) {
-  const fin = F.fin, W = FIN.W, s = g.size, T = F.clock || 0, seen = F.mode === 'seen';
+function drawWorld(ctx, g, F, vt, K) {
+  const fin = F.fin, W = FIN.W, s = g.size, T = F.clock || 0, seen = F.mode === 'seen', { osc, RM } = K;
   const [x, y] = g.px(W[0], W[1]);
   const lag = seen ? FIN.WR : 0;
   const n = F.now;
   // leak halo: every year from true 1
   if (n - lag >= 1) {
-    ctx.save(); ctx.globalAlpha = 0.25 + 0.2 * Math.sin(T / 90) * Math.sin(T / 370);
+    ctx.save(); ctx.globalAlpha = RM ? 0.35 : 0.25 + 0.2 * osc(90) * osc(370);
     ctx.strokeStyle = COL.world; ctx.lineWidth = 1; ctx.setLineDash([1, 3]);
     ctx.beginPath(); ctx.arc(x, y, s * 0.95, 0, 7); ctx.stroke(); ctx.restore();
   }
@@ -1051,16 +1305,18 @@ function drawWorld(ctx, g, F, vt) {
   gr.addColorStop(0, '#e6f3ff'); gr.addColorStop(0.6, COL.world); gr.addColorStop(1, '#3a6aa8');
   ctx.save(); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, s * 0.52, 0, 7); ctx.fill();
   ctx.strokeStyle = 'rgba(200,230,255,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, s * 0.68, 0, 7); ctx.stroke(); ctx.restore();
+  K.keep(x, y, s * 0.72);
   // call this year
   if (fin.calls.includes(n - lag)) {
-    const ph = (T % 1600) / 1600;
+    const ph = RM ? 0.35 : (T % 1600) / 1600;
     ctx.save(); ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = 1 - ph; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, s * (0.6 + ph * 0.9), 0, 7); ctx.stroke(); ctx.restore();
-    blips(ctx, x, y - s * 1.15, [2, 3, 5, 7], '#ffffff', s, T);
+    blips(ctx, x, y - s * 1.2, [2, 3, 5, 7], '#ffffff', s, RM ? null : T);
+    K.keep(x, y - s * 1.05, s * 0.45, 4);
   }
   if (FIN.NOTYET.includes(n - lag)) {
-    const ph = ((T + 800) % 2000) / 2000;
+    const ph = RM ? 0.3 : ((T + 800) % 2000) / 2000;
     ctx.save(); ctx.strokeStyle = COL.amber; ctx.globalAlpha = (1 - ph) * 0.8; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, s * (0.55 + ph * 0.6), 0, 7); ctx.stroke(); ctx.restore();
-    pill(ctx, x - s * 1.6, y + s * 1.0, 'NOT YET', COL.amber, 0.9, Math.max(9, Math.min(11, s * 0.5)));
+    K.pills.push({ x, y, gap: s * 0.75, text: 'NOT YET', color: COL.amber, alpha: 0.95, fs: K.smallFs, prio: 1.5, prefer: 'below' });
   }
   // true-mode fronts from W: calls, not-yet, reply
   if (!seen) {
@@ -1080,16 +1336,19 @@ function drawWorld(ctx, g, F, vt) {
       const [px, py] = g.px(ps[1][0], ps[1][1]);
       ctx.save(); ctx.fillStyle = '#cfe6ff'; ctx.translate(px + s * 0.35, py + s * 0.3); ctx.rotate(Math.atan2(-py + g.cy, -px + g.cx) + Math.PI / 2);
       ctx.beginPath(); ctx.moveTo(0, -s * 0.3); ctx.lineTo(s * 0.2, s * 0.25); ctx.lineTo(-s * 0.2, s * 0.25); ctx.closePath(); ctx.fill(); ctx.restore();
+      K.keep(px + s * 0.35, py + s * 0.3, s * 0.35);
     }
   }
-  label(ctx, x, y + s * 1.05, 'W', COL.world, s * 0.9);
+  ctx.save(); ctx.font = `700 ${Math.round(Math.max(10, Math.min(13, s * 0.5)))}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  haloText(ctx, 'W', x, y + s * 0.98, COL.world); ctx.restore();
+  K.keep(x, y + s * 0.98, s * 0.3, 4);
 }
 
 function blips(ctx, x, y, groups, color, s, T) {
   const total = groups.reduce((a, b) => a + b, 0) + groups.length - 1;
   const w = s * 0.14; let i = 0;
   ctx.save(); ctx.fillStyle = color;
-  const lit = Math.floor((T / 90) % (total + 8));
+  const lit = T === null ? total : Math.floor((T / 90) % (total + 8));
   for (let gi = 0; gi < groups.length; gi++) {
     for (let k = 0; k < groups[gi]; k++) { ctx.globalAlpha = i <= lit ? 0.95 : 0.2; ctx.fillRect(x - total * w / 2 + i * w, y, w * 0.6, w * 1.6); i++; }
     i++;
@@ -1098,17 +1357,17 @@ function blips(ctx, x, y, groups, color, s, T) {
 }
 
 function label(ctx, x, y, text, color, s) {
-  ctx.save(); ctx.font = `700 ${Math.max(9, Math.min(14, s * 0.5))}px system-ui, sans-serif`; ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.save(); ctx.font = `700 ${Math.max(9, Math.min(14, s * 0.5))}px ${FONT}`; ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(text, x, y + 0.5); ctx.restore();
 }
 function badge(ctx, x, y, ch, color, s) {
-  ctx.save(); ctx.fillStyle = 'rgba(5,10,23,0.9)'; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+  ctx.save(); ctx.fillStyle = 'rgba(5,10,23,0.92)'; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.arc(x, y, s * 0.26, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = color; ctx.font = `800 ${Math.max(9, s * 0.34)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, x, y + 0.5); ctx.restore();
+  ctx.fillStyle = color; ctx.font = `800 ${Math.max(9, s * 0.34)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, x, y + 0.5); ctx.restore();
 }
 function needDots(ctx, x, y, n, s) {
   ctx.save(); ctx.fillStyle = COL.relay;
-  for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(x + (i - (n - 1) / 2) * s * 0.2, y, s * 0.06, 0, 7); ctx.fill(); }
+  for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(x + (i - (n - 1) / 2) * s * 0.2, y, Math.max(1.4, s * 0.06), 0, 7); ctx.fill(); }
   ctx.restore();
 }
 
@@ -1172,18 +1431,23 @@ const STARS = Array.from({ length: 70 }, () => [Math.random(), Math.random(), 0.
 
 // ---------- canvas ----------
 const canvas = $('board'), ctx = canvas.getContext('2d');
-let geom = null;
+let geom = null, lastLayout = '';
+const CHIP_ROW = 44 + 6; // an outbox or chips row plus the dock gap
 function layout() {
   if (!G.L) return;
-  const wrap = $('boardwrap');
-  const w = wrap.clientWidth, h = wrap.clientHeight;
-  // size against the tallest dock so the board doesn't jump when chips appear
-  const reserved = innerHeight - 48 - 32 - 236;
-  let side = Math.min(w - 8, Math.max(reserved, 0));
-  if (side < 240 || side > h) side = Math.min(w - 8, h - 4);
-  side = Math.max(140, Math.floor(side));
+  const wrap = $('boardwrap'), dock = $('dock');
+  const w = wrap.clientWidth, top = wrap.getBoundingClientRect().top;
+  // Size and place the board against the tallest dock (outbox and chips both
+  // showing), so the board never moves when orders are queued or a drone is selected.
+  const dockMax = dock.offsetHeight + ($('outbox').childElementCount ? 0 : CHIP_ROW) + ($('chips').childElementCount ? 0 : CHIP_ROW);
+  const avail = Math.floor(dock.getBoundingClientRect().bottom - top - dockMax);
+  const side = Math.max(140, Math.floor(Math.min(w - 8, avail - 4)));
+  const mt = Math.max(0, Math.floor((avail - side) / 2));
   const dpr = Math.min(3, window.devicePixelRatio || 1);
-  canvas.style.width = side + 'px'; canvas.style.height = side + 'px';
+  const key = [side, mt, dpr, G.L.R].join();
+  if (key === lastLayout && geom) return;
+  lastLayout = key;
+  canvas.style.width = side + 'px'; canvas.style.height = side + 'px'; canvas.style.marginTop = mt + 'px';
   canvas.width = Math.round(side * dpr); canvas.height = Math.round(side * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   geom = makeGeom(side, side, G.L.R);
@@ -1191,14 +1455,27 @@ function layout() {
 window.addEventListener('resize', () => { layout(); if (replayCtl) replayCtl.resize(); });
 if (window.ResizeObserver) new ResizeObserver(() => layout()).observe($('boardwrap'));
 
+// the light of the last required event reaching Home (drawn on the confirming year)
+function confirmFx() {
+  if (!G.won) return null;
+  if (G.out) return { at: G.out.confirmed_at_home, pts: G.out.req.filter((e) => SIM.seenTick(e) === G.out.confirmed_at_home).map((e) => e.pos) };
+  if (G.fin && G.fin.endSeen !== null) return { at: G.fin.endSeen, pts: [G.fin.forward ? G.fin.forward.pos : FIN.W] };
+  return null;
+}
 function frame() {
   return {
     level: G.L, res: G.res, now: G.now, p: G.p, mode: 'seen', unlock: G.unlock, exitSeen: G.exitSeen, exitTrue: G.exitTrue,
     showHidden: false, fin: G.fin, clock: performance.now(), stars: STARS, ui: Object.assign({ selected: G.sel }, G.ui),
+    reduced: reduced(), confirm: confirmFx(),
   };
 }
+const tickbar = $('tickbar');
+let tickOn = false;
 function loop(t) {
-  if (G.p < 1) G.p = Math.min(1, (t - G.animT0) / ANIM);
+  if (G.p < 1) G.p = Math.max(0, Math.min(1, (t - G.animT0) / ANIM));
+  // a hairline under the top bar fills while each year passes
+  if (G.p < 1) { tickbar.style.transform = `scaleX(${G.p.toFixed(3)})`; if (!tickOn) { tickbar.classList.add('on'); tickOn = true; } }
+  else if (tickOn) { tickbar.style.transform = 'scaleX(1)'; tickbar.classList.remove('on'); tickOn = false; }
   if (G.L && geom && $('overlay').classList.contains('hidden')) render(ctx, geom, frame());
   if (replayCtl) replayCtl.tick(t);
   if (waveCtl) waveCtl(t);
@@ -1235,10 +1512,12 @@ function advance() {
   const sent = G.queue.length;
   for (const o of G.queue) G.plan.push(Object.assign({ t: G.now }, o));
   G.queue = [];
-  if (sent) { resim(); AU.thoom(); G.sel = null; G.mode = 'move'; }
+  if (sent) {
+    resim(); AU.thoom(); G.sel = null; G.mode = 'move';
+    const pr = $('primary'); pr.classList.remove('sent'); void pr.offsetWidth; pr.classList.add('sent');
+  }
   G.now++;
   G.p = reduced() ? 1 : 0; G.animT0 = performance.now();
-  const yb = $('year'); yb.classList.remove('bump'); void yb.offsetWidth; yb.classList.add('bump');
   const news = processYear(G.now);
   tutorialAfterAdvance(sent);
   updateUI();
@@ -1259,8 +1538,8 @@ function processYear(n) {
       if (w && w.hidden) hiddenGlint = w; else glint = true;
     } else if (e.type === 'sign') { AU.sign(); addLog(`${nm(e.data)} signed. (Year ${e.t}, seen year ${n}.)`); }
     else if (e.type === 'offended') { AU.object(); onOffended(e); }
-    else if (e.type === 'tag') addLog(`Seen: ${e.data[1]} tagged ${e.data[0]} in year ${e.t}.`);
-    else if (e.type === 'rec_on') addLog(`Seen: the relay woke in year ${e.t}.`);
+    else if (e.type === 'tag') { AU.tag(); addLog(`Seen: ${e.data[1]} tagged ${e.data[0]} in year ${e.t}.`); }
+    else if (e.type === 'rec_on') { AU.wake(); addLog(`Seen: the relay woke in year ${e.t}.`); }
     else if (e.type === 'exit') onExit(e);
     else if (e.type === 'split') { addLog(`${nm(e.data[0])} has divided. ${nm(e.data[1])} has been independent since year ${e.t}. Nobody has asked it anything.`); unlockCodex('split'); setCoach(`${nm(e.data[0])} has divided. Requests addressed to ${nm(e.data[0])} do not count for ${nm(e.data[1])}.`, { dismiss: true }); }
     else if (e.type === 'declined') addLog(`${e.data[0]}: noted.`);
@@ -1281,12 +1560,8 @@ function processYear(n) {
     news = true;
     const chg = G.flags.chg[key] = G.flags.chg[key] || [];
     chg.push(n);
-    if (key.startsWith('der:') && G.n >= 2 && chg.length >= 2 && chg[chg.length - 2] === n - 2 && SIM.ring(b[1]) < SIM.ring(a[1]) && !has('hurry')) {
-      unlockCodex('hurry'); addLog(CODEX.hurry.b);
-    }
-    if (key.startsWith('drone:') && chg.length >= 2 && chg[chg.length - 2] === n - 1 && SIM.ring(b[1]) < SIM.ring(a[1]) && !has('fastdrone')) {
-      unlockCodex('fastdrone'); addLog(CODEX.fastdrone.b);
-    }
+    if (key.startsWith('der:') && G.n >= 2 && chg.length >= 2 && chg[chg.length - 2] === n - 2 && SIM.ring(b[1]) < SIM.ring(a[1]) && !has('hurry')) discover('hurry');
+    if (key.startsWith('drone:') && chg.length >= 2 && chg[chg.length - 2] === n - 1 && SIM.ring(b[1]) < SIM.ring(a[1]) && !has('fastdrone')) discover('fastdrone');
   }
   for (const id in G.unlock) if (G.unlock[id] === n) {
     news = true;
@@ -1298,6 +1573,11 @@ function processYear(n) {
 }
 const has = (k) => G.save.codex.includes(k);
 function unlockCodex(k) { if (!has(k)) { G.save.codex.push(k); persist(); } }
+// a discovery gets the whole line, not a truncated log entry
+function discover(k) {
+  unlockCodex(k); addLog(CODEX[k].b);
+  if (!(G.tut >= 0 && G.tut < 4)) setCoach(CODEX[k].b, { dismiss: true, kicker: 'Codex · ' + CODEX[k].t });
+}
 
 function onOffended(e) {
   const N = Math.min(...e.cause);
@@ -1307,7 +1587,7 @@ function onOffended(e) {
   if (G.n === 6) {
     const askers = {};
     for (const o of G.plan) if (o.kind === 'FLASH' && o.arg) (askers[o.who] = askers[o.who] || new Set()).add(o.arg);
-    if (Object.values(askers).some((s) => s.has('P') && s.has('Q')) && !has('departure')) { unlockCodex('departure'); addLog(CODEX.departure.b); }
+    if (Object.values(askers).some((s) => s.has('P') && s.has('Q')) && !has('departure')) discover('departure');
   }
 }
 function onExit(e) {
@@ -1337,7 +1617,7 @@ function onWin() {
   setCoach(`Confirmed. It happened in year ${o.happened_at}. You found out in year ${o.confirmed_at_home}.`);
   updateUI();
   const token = G.levelToken;
-  setTimeout(() => { if (G.won && G.levelToken === token) showWin(); }, reduced() ? 400 : 1500);
+  setTimeout(() => { if (G.won && G.levelToken === token) showWin(); }, reduced() ? 900 : 1800);
 }
 
 function rewindTo(y) {
@@ -1449,7 +1729,11 @@ function knownTargets() {
     if (r.cell) out.push({ id: r.id, kind: 'fix', pos: r.cell, color: COL.relay });
     else if (SIM.seenPos(G.res.hist['der:' + r.ride], G.now)) out.push({ id: r.id, kind: 'ride', ride: r.ride, color: COL.relay });
   }
-  for (const w of knownWatchers()) out.push({ id: w.id, kind: 'fix', pos: w.pos, born: w.born, color: '#dccbff' });
+  for (const w of knownWatchers()) {
+    // once Home has seen a watcher sign or object, other people's requests can't change it
+    const settled = G.res.events.some((e) => (e.type === 'sign' || e.type === 'offended') && e.data === w.id && SIM.seenTick(e) <= G.now);
+    out.push({ id: w.id, kind: 'fix', pos: w.pos, born: w.born, color: '#dccbff', settled });
+  }
   if (G.L.world) out.push({ id: 'W', kind: 'fix', pos: FIN.W, color: COL.world });
   return out;
 }
@@ -1498,6 +1782,7 @@ function computeTags() {
         if (!o.queued && at !== '?' && at < G.now) continue;
         const addressed = o.arg && k.id === o.arg;
         if (G.L.world && k.id === 'W' && !addressed) continue;
+        if (k.settled && !addressed) continue;
         tags.push({ pos, text: `${addressed ? '\u2192 ' : ''}reaches yr ${at}`, color: k.color, queued: !!o.queued });
         if (addressed || (!o.arg && k.kind !== 'fix') || (!o.arg && G.L.receivers && G.L.receivers.some((r) => r.id === k.id))) txt = `reaches ${nm(k.id)} yr ${at}`;
       }
@@ -1511,14 +1796,24 @@ function computeTags() {
 }
 
 // ---------- UI ----------
+let shownYear = null;
+function setText(id, text) { const el = $(id); if (el.textContent !== text) el.textContent = text; }
 function updateUI() {
   const L = G.L; if (!L) return;
-  $('lvlname').innerHTML = `<span class="n">${G.n} \u00b7</span>${esc(L.name)}`;
-  $('year').innerHTML = `YEAR <b>${G.now}</b>`;
+  const ln = $('lvlname'), lnHTML = `<span class="n">${G.n} \u00b7</span>${esc(L.name)}`;
+  if (ln.innerHTML !== lnHTML) { ln.innerHTML = lnHTML; ln.classList.remove('tight'); }
+  if (!ln.classList.contains('tight') && ln.scrollWidth > ln.clientWidth + 1) ln.classList.add('tight'); // long names drop the number
+  // the year rolls only when it changes (not on every tap)
+  const yb = $('year').querySelector('b');
+  if (shownYear !== G.now) {
+    const fwd = shownYear !== null && G.now === shownYear + 1;
+    yb.textContent = G.now; shownYear = G.now;
+    yb.classList.remove('roll'); if (fwd) { void yb.offsetWidth; yb.classList.add('roll'); }
+  }
   // objective
   let obj = L.objective.text;
   if (G.n === 8) obj = G.fin.sentYear !== null ? (G.fin.kind === 'delegate' || G.plan.some((o) => o.kind === 'STANDING') ? 'Petition 1: transferred to V.' : 'Petition 1: answered. Reply pending.') : 'Petition 1: pending.';
-  $('obj').innerHTML = `${esc(obj)} <span class="i">info</span>`;
+  setText('objtext', obj);
   // tags
   const ct = computeTags();
   const hl = [];
@@ -1526,11 +1821,14 @@ function updateUI() {
   if (G.tut === 1) { const sp = SIM.seenPos(G.res.hist['der:D1'], G.now); if (sp) hl.push(sp[1]); }
   G.ui = { tags: ct.tags, moveLines: ct.lines, highlight: hl };
   // outbox
-  const ob = $('outbox'); ob.innerHTML = '';
+  const ob = $('outbox');
+  const had = new Set([...ob.children].map((c) => c.dataset.k)); // only new orders animate in
+  ob.innerHTML = '';
   G.queue.forEach((o, i) => {
-    const b = document.createElement('span'); b.className = 'chip out';
+    const b = document.createElement('span'), k = [o.kind, o.who, o.arg].join('|');
+    b.className = 'chip out' + (had.has(k) ? ' old' : ''); b.dataset.k = k;
     const what = o.kind === 'MOVE' ? 'move' : o.kind === 'STANDING' ? 'standing' : o.kind === 'PING' ? (o.arg === 'W' ? 'answer W' : `ask ${nm(o.arg)}`) : o.arg ? (o.arg === 'W' ? 'answer W' : `ask ${nm(o.arg)}`) : 'flash';
-    b.innerHTML = `${o.who === 'HOME' ? 'Home' : esc(o.who)} \u2192 ${esc(what)}${ct.info[i] ? ' \u00b7 ' + esc(ct.info[i]) : ''}`;
+    b.innerHTML = `<span class="who">${o.who === 'HOME' ? 'Home' : esc(o.who)}</span> \u2192 ${esc(what)}${ct.info[i] ? ` <span class="eta">\u00b7 ${esc(ct.info[i])}</span>` : ''}`;
     if (G.tut !== 2) {
       const x = document.createElement('button'); x.className = 'x'; x.setAttribute('aria-label', 'Remove order'); x.textContent = '\u2715';
       x.onclick = (ev) => { ev.stopPropagation(); G.queue.splice(i, 1); updateUI(); };
@@ -1539,8 +1837,11 @@ function updateUI() {
     ob.appendChild(b);
   });
   // chips
-  const ch = $('chips'); ch.innerHTML = '';
+  const ch = $('chips');
+  const hadAnswer = !!ch.querySelector('.answerBtn');
+  ch.innerHTML = '';
   const chip = (label, cls, fn, aria) => { const b = document.createElement('button'); b.className = 'chip ' + (cls || ''); b.innerHTML = label; if (aria) b.setAttribute('aria-label', aria); b.onclick = (ev) => { ev.stopPropagation(); AU.init(); stopFF(); fn(); }; ch.appendChild(b); return b; };
+  const chipHint = (text) => { const h = document.createElement('span'); h.className = 'chip hint'; h.textContent = text; ch.appendChild(h); };
   const fin = G.fin, callSeen = G.n === 8 && G.now >= 10;
   const decisiveQueued = G.queue.some((o) => (o.arg === 'W') || o.kind === 'STANDING');
   const decisiveSent = fin && fin.sentYear !== null;
@@ -1554,27 +1855,35 @@ function updateUI() {
       chip('STANDING', 'blue', () => confirmSheet('Give standing', 'Give V the right to decide. It will no longer take your orders.', 'Give standing', () => { G.queue = G.queue.filter((o) => o.who !== 'V'); G.queue.push({ kind: 'STANDING', who: 'V', arg: null }); G.sel = null; updateUI(); }));
     }
     chip('\u2715', '', deselect, 'Deselect');
+    // say what the next tap does, while there is room for it
+    if (ch.children.length <= 3 && !(G.tut >= 0 && G.tut < 4)) {
+      const aimed = G.queue.some((o) => o.kind === 'MOVE' && o.who === id);
+      chipHint(G.mode === 'ask' ? 'Tap a watcher.' : aimed ? 'Tap to re-aim.' : 'Tap a hex to aim.');
+    }
   } else if (G.sel === 'HOME' && !G.won) {
     chip('ASK', 'violet on', () => {});
-    const hint = document.createElement('span'); hint.className = 'chip'; hint.style.border = '0'; hint.style.background = 'none'; hint.style.color = 'var(--dim)'; hint.style.fontWeight = '500';
-    hint.textContent = 'Tap a watcher.'; ch.appendChild(hint);
     chip('\u2715', '', deselect, 'Deselect');
+    chipHint('Tap a watcher.');
   } else if (G.n === 8 && callSeen && !decisiveSent && !decisiveQueued && !G.locked && !G.won) {
-    const b = document.createElement('button'); b.className = 'answerBtn'; b.textContent = 'Answer them';
+    const b = document.createElement('button'); b.className = 'answerBtn' + (hadAnswer ? ' old' : ''); b.textContent = 'Answer them';
     b.onclick = () => { AU.init(); confirmSheet('Answer them', 'This cannot be recalled. It reaches them in 5 years, and they will be ten years older than the voices you heard.', 'Send', () => { G.queue.push({ kind: 'PING', who: 'HOME', arg: 'W' }); updateUI(); }); };
     ch.appendChild(b);
   }
+  ch.classList.toggle('compact', ch.querySelectorAll('button').length > 3);
+  const hint = ch.querySelector('.hint');
+  if (hint && ch.scrollWidth > ch.clientWidth + 1) hint.remove(); // never a clipped hint
   // primary
-  const pr = $('primary'); pr.className = 'primary'; pr.disabled = false;
-  let lab = 'WAIT \u25B8';
+  const pr = $('primary');
+  let lab = 'WAIT \u25B8', state = '';
   if (G.n === 8 && G.finIntro < 3) lab = 'CONTINUE \u25B8';
-  else if (G.queue.length) { lab = `TRANSMIT ${G.queue.length} \u25B8`; pr.classList.add('tx'); }
-  else if (G.n === 8 && decisiveSent) { lab = 'LISTENING \u25B8'; pr.classList.add('listen'); }
-  else if (G.n === 8 && callSeen) { lab = 'PENDING \u25B8'; pr.classList.add('pend'); }
-  if (G.locked) { pr.disabled = true; lab = G.n === 8 && !decisiveSent ? 'PENDING' : lab; }
-  if (G.won) pr.disabled = true;
-  if (G.tut === 2 || G.tut === 3) pr.classList.add('pulse');
-  pr.textContent = lab;
+  else if (G.queue.length) { lab = `TRANSMIT ${G.queue.length} \u25B8`; state = 'tx'; }
+  else if (G.n === 8 && decisiveSent) { lab = 'LISTENING \u25B8'; state = 'listen'; }
+  else if (G.n === 8 && callSeen) { lab = 'PENDING \u25B8'; state = 'pend'; }
+  if (G.locked) lab = G.n === 8 && !decisiveSent ? 'PENDING' : lab;
+  for (const c of ['tx', 'listen', 'pend']) pr.classList.toggle(c, c === state);
+  pr.classList.toggle('pulse', G.tut === 2 || G.tut === 3);
+  pr.disabled = !!(G.locked || G.won);
+  setText('primary', lab);
   const ff = $('ff');
   ff.disabled = G.n === 8 || G.won || G.locked || (G.tut >= 0 && G.tut < 4);
   ff.classList.toggle('on', !!G.ff);
@@ -1598,17 +1907,20 @@ function scheduleLogLine() {
   if (logShown < G.logs.length - 2) logShown = G.logs.length - 2; // don't lag too far behind
   step();
 }
+let shownAct = null;
 function renderLogLine(fresh) {
   const l = G.logs[Math.min(logShown, G.logs.length - 1)];
   const lt = $('logtext'), la = $('logact');
   lt.textContent = l ? l.text : '';
-  if (fresh) { lt.classList.remove('fresh'); void lt.offsetWidth; lt.classList.add('fresh'); }
-  la.innerHTML = '';
+  if (fresh) for (const el of [lt, $('log')]) { el.classList.remove('fresh'); void el.offsetWidth; el.classList.add('fresh'); }
   // the newest open action (smart rewind) stays reachable
   const act = [...G.logs].reverse().find((x) => x.action && !x.used && x.y <= G.now);
-  if (act && !G.won) {
-    const b = document.createElement('button'); b.textContent = act.action.label + ' \u21BA';
-    b.onclick = (ev) => { ev.stopPropagation(); act.used = true; act.action.fn(); };
+  const want = act && !G.won ? act : null;
+  if (want === shownAct && (!want || la.childElementCount)) return;
+  shownAct = want; la.innerHTML = '';
+  if (want) {
+    const b = document.createElement('button'); b.textContent = want.action.label + ' \u21BA';
+    b.onclick = (ev) => { ev.stopPropagation(); want.used = true; want.action.fn(); };
     la.appendChild(b);
   }
 }
@@ -1617,7 +1929,7 @@ function renderLogLine(fresh) {
 let coachOpts = {};
 function setCoach(text, opts = {}) {
   const c = $('coach'); coachOpts = opts;
-  c.innerHTML = esc(text) + (opts.tap ? '<span class="more">TAP TO CONTINUE</span>' : opts.dismiss ? '<span class="more">TAP TO DISMISS</span>' : '');
+  c.innerHTML = (opts.kicker ? `<span class="kick">${esc(opts.kicker)}</span>` : '') + esc(text) + (opts.tap ? '<span class="more">TAP TO CONTINUE</span>' : opts.dismiss ? '<span class="more">TAP TO DISMISS</span>' : '');
   c.classList.remove('hidden'); c.classList.toggle('tap', !!(opts.tap || opts.dismiss));
 }
 function clearCoach() { $('coach').classList.add('hidden'); coachOpts = {}; }
@@ -1631,6 +1943,7 @@ function untilNews() {
   if ($('ff').disabled) return;
   AU.init();
   if (G.ff) { stopFF(); return; }
+  if (!G.save.ffSeen) { G.save.ffSeen = true; persist(); toast('Until news: years pass until something changes. Eight at most.'); }
   let k = 0;
   const step = () => {
     if (!G.ff) return;
@@ -1651,6 +1964,7 @@ function openSheet(html, mount) {
 }
 function closeSheet() { $('sheet').classList.add('hidden'); $('sheetBack').classList.add('hidden'); }
 $('sheetBack').addEventListener('click', closeSheet);
+$('sheetX').addEventListener('click', closeSheet);
 function confirmSheet(title, body, yes, fn) {
   openSheet(`<h2>${esc(title)}</h2><p>${esc(body)}</p><div class="btnrow"><button id="cNo">Not yet</button><button class="go" id="cYes">${esc(yes)}</button></div>`, (el) => {
     el.querySelector('#cNo').onclick = closeSheet;
@@ -1705,22 +2019,24 @@ function inspect(hex) {
   if (L.world && G.fin.probe) { const ps = FIN.probeSeen(G.now); if (ps && SIM.eq(ps[1], hex)) parts.push(`<h2><span class="k">Their instrument</span>A probe</h2><p>Coming this way at half the speed of light. It appears to hurry. It isn't hurrying. Seen as it was ${G.now - ps[0]} years ago.</p>`); }
   if (SIM.eq(hex, SIM.HOME)) parts.push(`<h2><span class="k">You</span>HOME</h2><p>An old, careful listening post. You see everything as it was. Your orders arrive late.</p>`);
   if (!parts.length) { const r = SIM.ring(hex); toast(r === 0 ? 'Home.' : `Ring ${r}. Light from here is ${r} year${r === 1 ? '' : 's'} old.`); return; }
-  openSheet(parts.join('<hr style="border:0;border-top:1px solid var(--line);margin:12px 0">'));
+  openSheet(parts.join('<hr>'));
 }
 
 function openMenu() {
   AU.init();
   const s = G.save.settings;
-  openSheet(`<div class="menu">
+  openSheet(`<h2><span class="k">Level ${G.n} · Year ${G.now}</span>${esc(G.L.name)}</h2><div class="menu">
     <button id="mRestart">Restart level</button>
     <button id="mRewind" ${G.now === 0 || G.locked ? 'disabled' : ''}>Rewind 1 year <span class="v">to year ${Math.max(0, G.now - 1)}</span></button>
     <button id="mHint">Hint</button>
-    <button id="mLevels">Level select</button>
-    <button id="mLog">Home log</button>
-    <button id="mCodex">Codex <span class="v">${G.save.codex.length} found</span></button>
-    <button id="mScale">How light works here</button>
-    <button id="mSound">Sound <span class="v">${s.sound ? 'On' : 'Off'}</span></button>
-    <button id="mMotion">Reduced motion <span class="v">${s.reduced ? 'On' : mqReduce.matches ? 'On (system)' : 'Off'}</span></button>
+    <div class="grid">
+      <button id="mLevels">Level select</button>
+      <button id="mLog">Home log</button>
+      <button id="mCodex">Codex <span class="v">${G.save.codex.length} of ${Object.keys(CODEX).length} found</span></button>
+      <button id="mScale">How light works</button>
+      <button id="mSound">Sound <span class="v${s.sound ? ' on' : ''}">${s.sound ? 'On' : 'Off'}</span></button>
+      <button id="mMotion">Reduced motion <span class="v${s.reduced || mqReduce.matches ? ' on' : ''}">${s.reduced ? 'On' : mqReduce.matches ? 'On (system)' : 'Off'}</span></button>
+    </div>
   </div>`, (el) => {
     el.querySelector('#mRestart').onclick = () => { closeSheet(); if (G.locked && G.n === 8) return; loadLevel(G.n); };
     el.querySelector('#mRewind').onclick = () => { closeSheet(); rewindTo(G.now - 1); };
@@ -1748,7 +2064,7 @@ function openLevels() {
   const all = G.save.endingsFound.length > 0;
   const row = (n) => {
     const L = levelData(n); const lock = !all && n > G.save.reached;
-    return `<button data-n="${n}" ${lock ? 'disabled' : ''}><span class="num">${n}</span>${lock ? 'Locked' : esc(L.name)}${G.save.cleared.includes(n) ? '<span class="done">\u2713</span>' : ''}</button>`;
+    return `<button data-n="${n}" ${lock ? 'disabled' : ''} class="${n === G.n ? 'cur' : ''}"><span class="num">${n}</span>${lock ? 'Locked' : esc(L.name)}${G.save.cleared.includes(n) ? '<span class="done">\u2713</span>' : ''}</button>`;
   };
   openSheet(`<h2>Levels</h2><div class="lv"><div class="act">Act I \u00b7 Home</div>${[1, 2, 3, 4].map(row).join('')}<div class="act">Act II \u00b7 Neighbours</div>${[5, 6, 7].map(row).join('')}<div class="act">Act III</div>${row(8)}</div>
     ${G.save.endingsFound.length ? `<p class="found" style="margin-top:12px">Endings found: ${G.save.endingsFound.length} of 3</p>` : ''}`, (el) => {
@@ -1772,7 +2088,7 @@ function openObjective() {
   if (L.receivers) extra += L.receivers.map((r) => `<p class="rule">Relay ${esc(r.id)} wakes if ${r.need} open signals reach it in the same year.</p>`).join('');
   if (actOf(G.n) === 2) extra += '<p class="rule">Precedents sign only if the first request they hear is addressed to them. Ties are not first.</p>';
   if (G.n === 8) extra = '<p>Petition 1. Opened before this world had oxygen. Requires: the consent of its inhabitants.</p>';
-  openSheet(`<h2><span class="k">Objective</span>${esc($('obj').textContent.replace(/ info$/, ''))}</h2>${extra}
+  openSheet(`<h2><span class="k">Objective</span>${esc($('objtext').textContent)}</h2>${extra}
     <p>You win when the light from your success reaches Home, not when it happens.</p>
     <div class="btnrow"><button id="oScale">How light works here</button><button id="oHint">Hint</button></div>`, (el) => {
     el.querySelector('#oScale').onclick = openScale; el.querySelector('#oHint').onclick = openHints;
@@ -1819,8 +2135,10 @@ function cards(list, done, render) {
 // progressive lines: each tap adds a line on the same card
 function stack(head, lines, done, cls = 'line') {
   let i = 1;
+  const clsOf = typeof cls === 'function' ? cls : () => cls;
   const show = () => {
-    showOverlay(`<div class="card">${head || ''}${lines.slice(0, i).map((l, k) => `<div class="${cls}" style="animation-delay:${k === i - 1 ? 0 : 0}s">${esc(l)}</div>`).join('')}</div><div class="tapmore">tap</div>`, {
+    // only the newest line fades in; earlier ones stay put
+    showOverlay(`<div class="card${i > 1 ? ' still' : ''}">${head || ''}${lines.slice(0, i).map((l, k) => `<div class="${clsOf(k)}${k < i - 1 ? ' prev' : ''}">${esc(l)}</div>`).join('')}</div><div class="tapmore">tap</div>`, {
       tap: () => { if (i < lines.length) { i++; show(); } else done(); },
     });
   };
@@ -1829,12 +2147,13 @@ function stack(head, lines, done, cls = 'line') {
 
 function showTitle() {
   const cont = G.save.reached > 1;
-  showOverlay(`<div class="card"><div class="title">LIGHT LAG</div><div class="sub">Everything you can see has already happened.</div>
-    <div style="height:18px"></div>
+  showOverlay(`<div class="card"><div class="titlewrap"><div class="halo"></div><div class="halo b"></div><div class="title">LIGHT LAG</div></div>
+    <div class="sub">Everything you can see has already happened.</div>
+    <div style="height:14px"></div>
     <button class="bigbtn" id="tPlay">${cont ? `CONTINUE \u00b7 LEVEL ${Math.min(8, G.save.reached)}` : 'BEGIN'}</button>
     ${cont ? '<button class="ghostbtn" id="tLevels">Level select</button>' : ''}
     ${G.save.endingsFound.length ? `<div class="found">Endings found: ${G.save.endingsFound.length} of 3</div>` : ''}
-    <div class="caption" style="margin-top:8px">Headphones help. About 30 minutes.</div></div>`);
+    <div class="caption" style="margin-top:6px">Headphones help. About 30 minutes.</div></div>`);
   $('tPlay').onclick = () => { AU.init(); startLevel(Math.min(8, G.save.reached)); };
   const lv = $('tLevels'); if (lv) lv.onclick = () => { AU.init(); hideOverlay(); loadLevel(Math.min(8, G.save.reached)); openLevels(); };
 }
@@ -1857,7 +2176,7 @@ let replayCtl = null;
 function stopReplay() { replayCtl = null; }
 function startReplay(host, opts) {
   const cv = host.querySelector('canvas'), c2 = cv.getContext('2d');
-  const slider = host.querySelector('input'), ylab = host.querySelector('.y'), rl = host.querySelector('.rlabel');
+  const slider = host.querySelector('input'), ylab = host.querySelector('.y'), rl = host.querySelector('.rlabel'), rm = host.querySelector('.rmode');
   const segs = host.querySelectorAll('.seg button');
   const R = opts.level.R;
   let mode = 'true', v = 0, playing = true, t0 = performance.now(), g = null;
@@ -1865,10 +2184,16 @@ function startReplay(host, opts) {
   const unlock = {}; for (const d of opts.level.derelicts || []) unlock[d.id] = SIM.firstSeenMove(opts.level, d.id);
   const exitSeen = {}, exitTrue = {};
   for (const e of opts.res.events) if (e.type === 'exit') { exitTrue[e.data] = e.t; exitSeen[e.data] = SIM.seenTick(e); }
+  // the replay board takes whatever height the rest of the screen leaves
   function resize() {
     const maxW = Math.min(host.clientWidth || 340, 420);
-    const maxH = Math.max(160, innerHeight - (opts.tall ? 260 : 350));
-    const side = Math.floor(Math.min(maxW, maxH));
+    let side = maxW;
+    if (opts.fit) {
+      cv.style.width = '0px'; cv.style.height = '0px';
+      const cs = getComputedStyle(ov), padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      side = Math.min(maxW, ov.clientHeight - padV - opts.fit.scrollHeight - 2);
+    }
+    side = Math.max(150, Math.floor(side));
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     cv.style.width = side + 'px'; cv.style.height = side + 'px'; cv.width = side * dpr; cv.height = side * dpr;
     c2.setTransform(dpr, 0, 0, dpr, 0, 0); g = makeGeom(side, side, R);
@@ -1878,40 +2203,53 @@ function startReplay(host, opts) {
   slider.oninput = () => { playing = false; v = +slider.value; };
   segs.forEach((b) => { b.onclick = () => { mode = b.dataset.m; segs.forEach((x) => x.classList.toggle('on', x === b)); }; });
   segs.forEach((x) => x.classList.toggle('on', x.dataset.m === mode));
+  const again = host.querySelector('.rbtn');
+  if (again) again.onclick = () => ctl.replay();
   const ctl = {
     resize,
     replay() { v = 0; playing = true; t0 = performance.now(); },
     tick(t) {
-      if (playing) { v = Math.min(end, (t - t0) / dur * end); if (v >= end) playing = false; slider.value = v; }
+      if (playing) {
+        v = Math.max(0, Math.min(end, (t - t0) / dur * end));
+        if (reduced()) v = Math.floor(v); // whole years only: no sliding
+        if (v >= end) playing = false;
+        slider.value = v;
+      }
       const now = Math.max(0, Math.ceil(v - 1e-9)), p = now === 0 ? 1 : v - now + 1;
-      render(c2, g, { level: opts.level, res: opts.res, now, p, mode, unlock, exitSeen, exitTrue, showHidden: opts.showHidden, fin: opts.fin, clock: t, stars: STARS, newsEvents: opts.news, noLabels: true, ui: { tags: [], moveLines: [], highlight: [] } });
+      render(c2, g, { level: opts.level, res: opts.res, now, p, mode, unlock, exitSeen, exitTrue, showHidden: opts.showHidden, fin: opts.fin, clock: t, stars: STARS, newsEvents: opts.news, noLabels: true, reduced: reduced(), confirm: opts.confirm || null, ui: { tags: [], moveLines: [], highlight: [] } });
       ylab.textContent = `year ${Math.floor(v)}`;
-      rl.textContent = mode === 'true' ? 'AS IT WAS: what was really happening' : 'AS SEEN: what Home could see at the time';
+      rm.textContent = mode === 'true' ? 'As it was' : 'As seen';
+      rl.textContent = mode === 'true' ? 'What was really happening.' : 'What Home could see at the time.';
     },
   };
   replayCtl = ctl;
   return ctl;
 }
 function replayHTML() {
-  return `<div class="replay"><canvas></canvas><div class="seg"><button data-m="seen">AS SEEN</button><button data-m="true">AS IT WAS</button></div><div class="scrub"><input type="range" min="0" value="0" aria-label="Scrub years"><span class="y"></span></div><div class="rlabel"></div></div>`;
+  return `<div class="replay"><div class="rbox"><canvas></canvas><div class="rtag"><span class="rmode"></span><span class="y"></span></div></div>
+    <div class="rctl"><div class="seg"><button data-m="seen">AS SEEN</button><button data-m="true">AS IT WAS</button></div><button class="rbtn" aria-label="Play the replay again">\u21BA</button></div>
+    <div class="scrub"><input type="range" min="0" value="0" aria-label="Scrub years"></div><div class="rlabel"></div></div>`;
 }
 function showWin() {
   const o = G.out, sc = SCRIPT[G.n];
   let end = sc.end;
   if (G.n === 1) end = `Confirmed. It happened ${WORDS[o.lag] || o.lag} year${o.lag === 1 ? '' : 's'} ago. You found out just now. This will keep happening.`;
-  showOverlay(`<div class="win"><div class="head">Confirmed \u00b7 ${esc(G.L.name)}</div>
+  showOverlay(`<div class="win"><div class="kicker">Level ${G.n} \u00b7 ${esc(G.L.name)}</div><div class="conf">Confirmed</div>
     <div class="when">It happened in year <b>${o.happened_at}</b>.<br>You found out in year <b>${o.confirmed_at_home}</b>.</div>
     <div class="end">${esc(end)}</div>${replayHTML()}
-    <div class="btnrow"><button id="wAgain">Replay level</button><button class="go" id="wNext">${G.n === 7 ? 'Onward \u25B8' : 'Next \u25B8'}</button></div></div>`);
-  startReplay(ov.querySelector('.replay'), { level: G.L, res: G.res, end: o.confirmed_at_home, news: o.req, showHidden: G.save.reached >= 5 && G.n >= 5 || G.save.reached >= 6 });
+    <div class="btnrow"><button id="wAgain">Play again</button><button class="go" id="wNext">${G.n === 7 ? 'Onward \u25B8' : 'Next \u25B8'}</button></div></div>`);
+  const confirm = { at: o.confirmed_at_home, pts: o.req.filter((e) => SIM.seenTick(e) === o.confirmed_at_home).map((e) => e.pos) };
+  startReplay(ov.querySelector('.replay'), { level: G.L, res: G.res, end: o.confirmed_at_home, news: o.req, confirm, fit: ov.querySelector('.win'), showHidden: G.save.reached >= 5 && G.n >= 5 || G.save.reached >= 6 });
   $('wAgain').onclick = () => { hideOverlay(); loadLevel(G.n); };
   $('wNext').onclick = nextAfterWin;
 }
+// act cards: the first line is the act's title
+const actCard = (lines, done) => stack('', lines, done, (k) => (k === 0 ? 'ttl2' : 'line'));
 function nextAfterWin() {
   const n = G.n, sc = SCRIPT[n];
   stopReplay();
-  if (n === 4) stack('', sc.actCard, () => showInterstitial(() => startLevel(5)), 'line');
-  else if (n === 7) stack('', sc.actCard, () => startLevel(8), 'line');
+  if (n === 4) actCard(sc.actCard, () => showInterstitial(() => startLevel(5)));
+  else if (n === 7) actCard(sc.actCard, () => startLevel(8));
   else startLevel(n + 1);
 }
 
@@ -1925,24 +2263,30 @@ function showInterstitial(done) {
     const L = LEVELS_JSON[n - 1];
     const ref = Object.entries(L.test_plans).find(([k]) => k.startsWith('reference'))[1];
     const plan = ref.map((x) => ({ t: x[0], kind: x[1], who: x[2], arg: x[3] }));
-    return { L, res: SIM.simulate(L, plan, 30) };
+    const res = SIM.simulate(L, plan, 30);
+    // each filed glint resolves into the watcher that made it
+    const reveal = {};
+    for (const e of res.events) if (e.type === 'glint' && reveal[e.data] === undefined) reveal[e.data] = e.t;
+    return { L, res, reveal };
   });
+  const SPAN = 3.6, YEARS = 16;
+  const t0 = performance.now(); // one clock for the whole sequence, so taps don't restart the boards
   const show = () => {
     const last = i >= TEXT.interstitial.length;
-    showOverlay(`<div class="card"><canvas id="icv"></canvas>${last ? '<div class="kicker">Act II</div><div class="ttl2">Neighbours</div>' : `<div class="line">${esc(TEXT.interstitial[i])}</div>`}</div><div class="tapmore">tap</div>`, {
+    showOverlay(`<div class="card inter"><canvas id="icv"></canvas><div class="itext">${last ? '<div class="kicker">Act II</div><div class="ttl2">Neighbours</div>' : `<div class="line">${esc(TEXT.interstitial[i])}</div>`}</div></div><div class="tapmore">tap</div>`, {
       tap: () => { if (last) { interCtl = null; done(); } else { i++; show(); } },
     });
     const cv = $('icv'), c2 = cv.getContext('2d');
     const side = Math.floor(Math.min(320, innerWidth - 48, innerHeight * 0.42));
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     cv.style.width = side + 'px'; cv.style.height = side + 'px'; cv.width = side * dpr; cv.height = side * dpr; c2.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const t0 = performance.now();
+    const g = makeGeom(side, side, 4);
     interCtl = (t) => {
-      const el = (t - t0) / 1000, bi = Math.floor(el / 3.2) % 3, b = boards[bi];
-      const v = (el % 3.2) / 3.2 * 16, now = Math.max(0, Math.ceil(v)), p = now === 0 ? 1 : v - now + 1;
-      const g = makeGeom(side, side, b.L.R);
-      const mir = b.res.wat.filter((w) => w.hidden).map((w) => w.pos);
-      render(c2, g, { level: b.L, res: b.res, now, p, mode: 'true', unlock: {}, exitSeen: {}, exitTrue: {}, showHidden: true, clock: t, stars: STARS, noLabels: true, ui: { tags: [], moveLines: [], highlight: mir } });
+      const el = Math.max(0, t - t0) / 1000, bi = Math.floor(el / SPAN) % 3, b = boards[bi];
+      let v = (el % SPAN) / SPAN * YEARS;
+      if (reduced()) v = Math.floor(v);
+      const now = Math.max(0, Math.ceil(v)), p = now === 0 ? 1 : v - now + 1;
+      render(c2, g, { level: b.L, res: b.res, now, p, mode: 'true', unlock: {}, exitSeen: {}, exitTrue: {}, showHidden: true, reveal: b.reveal, clock: t, stars: STARS, noLabels: true, reduced: reduced(), ui: { tags: [], moveLines: [], highlight: [] } });
     };
   };
   show();
@@ -2011,7 +2355,7 @@ function showEnding(k) {
   const stampCls = k === 'answer' ? '' : k === 'delegate' ? 'gold' : 'blue';
   const doc = `<div class="stampwrap"><div class="doc">PETITION 1<br>Opened: before oxygen<br>Requires: consent of its inhabitants<br>Year: ${G.now}<br>Status:</div><div class="stamp ${stampCls}">${esc(E.stamp)}</div></div>`;
   const steps = [];
-  steps.push(() => { showOverlay(`<div class="card"><div class="kicker">Ending \u00b7 ${esc(E.name)}</div>${doc}</div><div class="tapmore">tap</div>`, { tap: next }); setTimeout(() => AU.stamp(), reduced() ? 0 : 650); });
+  steps.push(() => { showOverlay(`<div class="card"><div class="kicker">Ending \u00b7 ${esc(E.name)}</div>${doc}</div><div class="tapmore">tap</div>`, { tap: next }); setTimeout(() => AU.stamp(), reduced() ? 0 : 900); });
   const lines = (arr, cls) => steps.push(() => stack(`<div class="kicker">${esc(E.name)}</div>`, arr, next, cls || 'line'));
   if (k === 'answer') {
     lines(['You answered a question that was ten years old by the time your reply arrived.',
@@ -2019,7 +2363,7 @@ function showEnding(k) {
     steps.push(() => forest(['Light could show you their forests. It could never give you one.'].concat(f.probe ? ['They had already sent an instrument of their own toward you. It will arrive to find the door open.'] : []), next));
   } else if (k === 'delegate') {
     lines(["You couldn't ask them without answering them, so you gave the question to someone close enough to hear the answer still being given."]);
-    steps.push(() => showOverlay(`<div class="card"><div class="kicker">Forwarded by V</div><div class="stampwrap"><div class="doc">I listened until I was sure they were still asking. I answered with terms either side may withdraw from. The ones who said not yet are recorded. No participant warrants the absence of unknown harm.<br><br>\u2014 V</div></div></div><div class="tapmore">tap</div>`, { tap: next }));
+    steps.push(() => showOverlay(`<div class="card"><div class="kicker">Forwarded by V</div><div class="stampwrap"><div class="doc letter">I listened until I was sure they were still asking. I answered with terms either side may withdraw from. The ones who said not yet are recorded. No participant warrants the absence of unknown harm.<span class="sig">\u2014 V</span></div></div></div><div class="tapmore">tap</div>`, { tap: next }));
     steps.push(() => forest(["V doesn't take your orders any more. It writes sometimes. Late, of course."], next));
   } else {
     lines(['You did not answer. Their call went on for a while, and then it stopped.',
@@ -2027,9 +2371,10 @@ function showEnding(k) {
       'From inside every world like theirs, the galaxy looks empty.']);
   }
   steps.push(() => {
-    showOverlay(`<div class="win"><div class="head">What really happened</div><div class="end">Their world, as it was. Your choice, as it travelled.</div>${replayHTML()}<div class="btnrow"><button class="go" id="eNext">Continue \u25B8</button></div></div>`);
+    showOverlay(`<div class="win"><div class="kicker">Ending \u00B7 ${esc(E.name)}</div><div class="conf plain">What really happened</div><div class="end">Their world, as it was. Your choice, as it travelled.</div>${replayHTML()}<div class="btnrow"><button class="go" id="eNext">Continue \u25B8</button></div></div>`);
     const news = f.forward ? [{ t: f.forward.t, pos: f.forward.pos }] : [];
-    startReplay(ov.querySelector('.replay'), { level: G.L, res: G.res, end: Math.max(G.now, 12), news, fin: f, showHidden: true, tall: true });
+    const confirm = f.endSeen !== null ? { at: f.endSeen, pts: [f.forward ? f.forward.pos : FIN.W] } : null;
+    startReplay(ov.querySelector('.replay'), { level: G.L, res: G.res, end: Math.max(G.now, 12), news, fin: f, confirm, showHidden: true, fit: ov.querySelector('.win') });
     $('eNext').onclick = next;
   });
   steps.push(credits);
@@ -2054,20 +2399,29 @@ function forest(after, done) {
     c2.clearRect(0, 0, W, H);
     c2.strokeStyle = 'rgba(170,240,200,0.85)'; c2.lineWidth = 1.5; c2.beginPath();
     const an = AU.analyser;
-    if (an) { an.getByteTimeDomainData(buf); for (let x = 0; x < W; x++) { const v = (buf[Math.floor(x / W * buf.length)] - 128) / 128; const y = H / 2 + v * H * 1.6; x ? c2.lineTo(x, y) : c2.moveTo(x, y); } }
-    else {
-      const env = 0.55 + 0.45 * Math.sin(t / 1900);
-      for (let x = 0; x < W; x++) { const y = H / 2 + env * (Math.sin(x / 9 + t / 260) * 9 + Math.sin(x / 3.1 + t / 90) * 4 + Math.sin(x / 23 - t / 700) * 8) + (Math.random() - 0.5) * 3 * env + (Math.sin(t / 333) > 0.97 ? Math.sin(x / 1.2) * 10 * Math.exp(-Math.abs(x - W * 0.7) / 20) : 0); x ? c2.lineTo(x, y) : c2.moveTo(x, y); }
+    let live = false;
+    if (an) {
+      an.getByteTimeDomainData(buf);
+      // a blocked or silent output still gets the drawn forest
+      let peak = 0; for (let i = 0; i < buf.length; i += 8) peak = Math.max(peak, Math.abs(buf[i] - 128));
+      live = peak > 2;
     }
-    c2.stroke();
+    if (live) { for (let x = 0; x < W; x++) { const v = (buf[Math.floor(x / W * buf.length)] - 128) / 128; const y = H / 2 + v * H * 1.6; x ? c2.lineTo(x, y) : c2.moveTo(x, y); } }
+    else {
+      if (reduced()) t = 5200; // a still image of the same sound
+      const env = 0.55 + 0.45 * Math.sin(t / 1900);
+      for (let x = 0; x < W; x++) { const y = H / 2 + env * (Math.sin(x / 9 + t / 260) * 9 + Math.sin(x / 3.1 + t / 90) * 4 + Math.sin(x / 23 - t / 700) * 8) + (reduced() ? 0 : (Math.random() - 0.5) * 3 * env) + (Math.sin(t / 333) > 0.97 ? Math.sin(x / 1.2) * 10 * Math.exp(-Math.abs(x - W * 0.7) / 20) : 0); x ? c2.lineTo(x, y) : c2.moveTo(x, y); }
+    }
+    c2.shadowColor = 'rgba(170,240,200,0.6)'; c2.shadowBlur = 8;
+    c2.stroke(); c2.shadowBlur = 0;
   };
   void w;
 }
 function credits() {
   const found = G.save.endingsFound.length;
   showOverlay(`<div class="card credits"><div class="title">LIGHT LAG</div>${TEXT.credits.slice(1).map((l) => `<div class="line">${esc(l)}</div>`).join('')}
-    <div style="height:10px"></div><div class="found">Endings found: ${found} of 3</div>
-    <button class="bigbtn" id="cPlay">PLAY AGAIN</button></div>`);
+    <div class="tail"><div class="found">Endings found: ${found} of 3</div>
+    <button class="bigbtn" id="cPlay">PLAY AGAIN</button></div></div>`);
   $('cPlay').onclick = () => { hideOverlay(); loadLevel(8); openLevels(); };
 }
 
