@@ -78,7 +78,7 @@ function loop(t) {
   // a hairline under the top bar fills while each year passes
   if (G.p < 1) { tickbar.style.transform = `scaleX(${G.p.toFixed(3)})`; if (!tickOn) { tickbar.classList.add('on'); tickOn = true; } }
   else if (tickOn) { tickbar.style.transform = 'scaleX(1)'; tickbar.classList.remove('on'); tickOn = false; }
-  if (G.L && geom && $('overlay').classList.contains('hidden')) render(ctx, geom, frame());
+  if (G.L && geom && $('overlay').classList.contains('hidden')) { render(ctx, geom, frame()); if (G.beat) drawBeat(ctx, geom, t); }
   if (replayCtl) replayCtl.tick(t);
   if (waveCtl) waveCtl(t);
   if (interCtl) interCtl(t);
@@ -97,7 +97,7 @@ function loadLevel(n) {
   stopFF(); stopHold();
   G.levelToken = (G.levelToken || 0) + 1;
   G.n = n; G.L = levelData(n); G.plan = []; G.queue = []; G.now = 0; G.p = 1; G.sel = null; G.mode = 'move';
-  G.won = false; G.flags = { chg: {} }; G.glintIdx = 0; G.hint = 0; G.locked = false; G.logs = [];
+  G.won = false; G.flags = { chg: {} }; G.glintIdx = 0; G.hint = 0; G.locked = false; G.logs = []; G.beat = null;
   G.unlock = {};
   for (const d of G.L.derelicts || []) G.unlock[d.id] = SIM.firstSeenMove(G.L, d.id);
   G.tut = n === 1 && !G.save.tutorialDone ? 0 : -1;
@@ -110,6 +110,7 @@ function loadLevel(n) {
 }
 
 function advance() {
+  if (G.beat) endBeat();
   finishAnim();
   const sent = G.queue.length;
   for (const o of G.queue) G.plan.push(Object.assign({ t: G.now }, o));
@@ -226,7 +227,7 @@ function rewindTo(y) {
   if (G.locked) return;
   y = Math.max(0, Math.min(y, G.now));
   finishAnim(); stopFF();
-  G.plan = G.plan.filter((o) => o.t < y); G.queue = []; G.now = y; G.won = false; G.sel = null; G.mode = 'move';
+  G.plan = G.plan.filter((o) => o.t < y); G.queue = []; G.now = y; G.won = false; G.sel = null; G.mode = 'move'; G.beat = null;
   if (G.tut >= 0 && G.tut < 4) { G.tut = 4; }
   clearCoach(); resim(); addLog(`Rewound to year ${y}.`); updateUI();
 }
@@ -246,11 +247,124 @@ function tutTap(hex) {
     else toast('Tap your drone first: the gold triangle.');
   } else if (G.tut === 1) {
     const sp = SIM.seenPos(G.res.hist['der:D1'], G.now);
-    if (hex && sp && SIM.eq(hex, sp[1])) { queueMove('A', hex); G.tut = 2; setCoach('TRANSMIT. Your order travels at the speed of light.'); }
-    else toast('Tap the derelict at the top.');
+    if (hex && sp && SIM.eq(hex, sp[1])) {
+      queueMove('A', hex); G.tut = 2;
+      // before the first TRANSMIT, show the two delays apart on this very order
+      startBeat('A', hex, () => setCoach('TRANSMIT. Your order travels at the speed of light.'));
+    } else toast('Tap the derelict at the top.');
   } else if (G.tut === 2) toast('Tap TRANSMIT.');
   else if (G.tut === 3) toast('Tap WAIT.');
   updateUI();
+}
+
+// ---------- the two delays: a watch-only beat ----------
+// Plays a hypothetical order on a cloned sim (nothing is sent, nothing in the
+// level changes): first the order's light-speed flight to the drone, then the
+// drone's half-light-speed flight. Tap to skip ahead; TRANSMIT ends it.
+const BEAT_YEAR = 900, BEAT_HOLD = 1500;
+function startBeat(who, target, done) {
+  const t0 = G.now;
+  const plan = G.plan.concat([{ t: t0, kind: 'MOVE', who, arg: target }]);
+  const res = SIM.simulate(G.L, plan, t0 + 24);
+  const rx = res.events.find((e) => e.type === 'order_rx' && e.sent === t0 && e.data[0] === who && e.data[1] === 'MOVE');
+  if (!rx) { done(); return; }
+  const h = res.hist['drone:' + who], steps = [];
+  for (let y = rx.t + 1; y <= t0 + 24 && steps.length < 2; y++) if (!SIM.eq(h[y], h[y - 1])) steps.push({ t: y, pos: h[y] });
+  G.beat = { who, t0, rx: rx.t, h, steps, phase: 0, start: performance.now(), done };
+  beatCoach();
+  updateUI();
+}
+function beatCoach() {
+  // kept to two short lines: on a 360x560 screen there are ~80 px between A and the dock
+  const b = G.beat;
+  if (b.phase === 0) setCoach('the order flies at light speed, a hex a year.', { tap: beatTap, quiet: true, lead: 'Delay 1:' });
+  else setCoach(b.steps.length ? `${b.who} flies at half that, a hex every 2 years.` : `${b.who} is already there.`, { tap: beatTap, quiet: true, lead: 'Delay 2:' });
+  coachAvoid([b.h[b.t0], [2, -4]]);
+}
+// if the card would still reach one of these hexes (a wide font, a short screen), tighten it
+function coachAvoid(hexes) {
+  const c = $('coach');
+  c.classList.remove('snug');
+  if (!geom || c.classList.contains('hidden')) return;
+  const hits = () => {
+    const cr = c.getBoundingClientRect(), br = canvas.getBoundingClientRect();
+    return hexes.some((h) => { if (!h) return false; const p = geom.px(h[0], h[1]), x = br.left + p[0], y = br.top + p[1], s = geom.size; return !(y + s < cr.top || y - s > cr.bottom || x + s < cr.left || x - s > cr.right); });
+  };
+  if (hits()) c.classList.add('snug');
+}
+// years covered by the current phase, and where the beat is inside it
+function beatSpan(b) { return b.phase === 0 ? [b.t0, b.rx] : [b.rx, b.steps.length ? b.steps[b.steps.length - 1].t : b.rx]; }
+function beatTick(t) {
+  const b = G.beat;
+  const [y0, y1] = beatSpan(b), run = reduced() ? 0 : (y1 - y0) * BEAT_YEAR;
+  const el = t - b.start;
+  b.y = Math.min(y1, y0 + (run ? Math.max(0, el) / BEAT_YEAR : y1 - y0));
+  if (!b.landed && b.phase === 0 && b.y >= y1) { b.landed = true; AU.tick(); }
+  if (b.phase === 1) { const k = b.steps.filter((s) => s.t <= b.y).length; if (k > (b.stepped || 0)) { b.stepped = k; AU.step(); } }
+  if (el >= run + (reduced() ? BEAT_HOLD * 2 : BEAT_HOLD)) beatTap();
+}
+function beatTap() {
+  const b = G.beat;
+  if (!b) return;
+  const [y0, y1] = beatSpan(b), el = performance.now() - b.start;
+  if (!reduced() && el < (y1 - y0) * BEAT_YEAR) { b.start = performance.now() - (y1 - y0) * BEAT_YEAR; return; } // jump to the end of this flight
+  if (b.phase === 0) { b.phase = 1; b.start = performance.now(); beatCoach(); return; }
+  endBeat();
+}
+function endBeat() {
+  const b = G.beat;
+  if (!b) return;
+  G.beat = null; clearCoach(); b.done(); updateUI();
+}
+// drawn over the board: dashed, because all of it is Home's calculation
+function drawBeat(c, g, t) {
+  beatTick(t);
+  const b = G.beat;
+  if (!b) return;
+  const s = g.size, y = b.y, fs = Math.round(Math.max(10, Math.min(12, s * 0.46)));
+  const P = (p) => g.px(p[0], p[1]);
+  const at = (yy) => {
+    const a = b.h[Math.floor(yy)], z = b.h[Math.ceil(yy)] || a, [ax, ay] = P(a), [zx, zy] = P(z), f = ease(yy - Math.floor(yy));
+    return [lerp(ax, zx, f), lerp(ay, zy, f)];
+  };
+  c.save();
+  c.fillStyle = 'rgba(5,10,23,0.55)'; c.fillRect(0, 0, g.w, g.h);
+  const pill = (x, yy, text, color) => {
+    c.font = `600 ${fs}px ${FONT}`;
+    const w = Math.ceil(c.measureText(text).width) + 12, hh = fs + 7, r = { x: Math.round(Math.max(2, Math.min(g.w - w - 2, x - w / 2))), y: Math.round(yy - hh / 2), w, h: hh };
+    drawPill(c, r, { text, color, alpha: 1, fs });
+  };
+  // Home, and the order's front: one hex per year
+  const [hx, hy] = P(SIM.HOME), dRx = SIM.dist(SIM.HOME, b.h[b.rx]);
+  const r = b.phase === 0 ? Math.min(dRx, y - b.t0) : dRx;
+  c.fillStyle = COL.home; c.beginPath(); c.arc(hx, hy, s * 0.3, 0, 7); c.fill();
+  if (r > 0.02) {
+    frontPath(c, g, SIM.HOME, r);
+    c.strokeStyle = `rgba(${COL.order},${b.phase === 0 ? 0.25 : 0.1})`; c.lineWidth = 5; c.stroke();
+    c.setLineDash([5, 5]); c.strokeStyle = `rgba(${COL.order},${b.phase === 0 ? 0.95 : 0.4})`; c.lineWidth = 1.8; c.stroke(); c.setLineDash([]);
+  }
+  // the drone (calculated: dashed) and, once moving, its trail
+  const [sx, sy] = P(b.h[b.rx]), [dx, dy] = b.phase === 0 ? P(b.h[Math.min(b.rx, Math.max(b.t0, Math.floor(y)))]) : at(y);
+  if (b.phase === 1 && (dx !== sx || dy !== sy)) { c.setLineDash([2, 4]); c.strokeStyle = 'rgba(243,214,140,0.7)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(sx, sy); for (const st of b.steps) if (st.t <= y) { const [qx, qy] = P(st.pos); c.lineTo(qx, qy); } c.lineTo(dx, dy); c.stroke(); c.setLineDash([]); }
+  c.setLineDash([3, 3]); c.strokeStyle = COL.drone; c.lineWidth = 1.8; droneShape(c, dx, dy + s * 0.05, s * 0.62); c.stroke(); c.setLineDash([]);
+  label(c, dx, dy + s * 0.14, b.who, 'rgba(243,214,140,0.95)', s * 0.62);
+  if (b.landed || b.phase === 1) {
+    c.setLineDash([3, 3]); c.strokeStyle = `rgba(243,214,140,${b.phase === 0 ? 0.9 : 0.35})`; c.lineWidth = 1.6; c.beginPath(); c.arc(sx, sy, s * 0.9, 0, 7); c.stroke(); c.setLineDash([]);
+    pill(sx, sy + s * 1.35, `order lands · yr ${b.rx}`, COL.home);
+  }
+  if (b.phase === 1) for (const st of b.steps) if (st.t <= y) { const [qx, qy] = P(st.pos); pill(qx, qy - s * 1.1, `yr ${st.t}`, COL.drone); }
+  // the beat's own clock
+  pill(Math.max(40, g.w * 0.14), fs + 6, `year ${Math.floor(y + 1e-6)}`, COL.home);
+  c.restore();
+}
+function canBeat() { return G.n === 1 && !G.won && !G.beat && !G.locked && !(G.tut >= 0 && G.tut < 4) && !!dronePosCalc('A'); }
+function replayBeat() {
+  const q = G.queue.find((o) => o.kind === 'MOVE' && o.who === 'A');
+  const sp = SIM.seenPos(G.res.hist['der:D1'], G.now);
+  const target = q ? q.arg : sp && !(G.exitSeen.D1 <= G.now) ? sp[1] : null;
+  if (!target) { toast('Nothing to aim at just now.'); return; }
+  G.sel = null; G.mode = 'move'; stopFF();
+  startBeat('A', target, () => {});
 }
 
 // ---------- selection & orders ----------
@@ -293,6 +407,7 @@ function queueFlash(id, target) {
 function onBoardTap(x, y) {
   AU.init(); stopFF();
   if (!geom || G.locked) return;
+  if (G.beat) { beatTap(); return; } // the beat is watch-only: a tap moves it along
   const hex = geom.hexAt(x, y);
   if (G.n === 8 && G.finIntro < 3) { finIntroNext(); return; }
   if (G.won) return;
@@ -483,7 +598,7 @@ function updateUI() {
   else if (G.n === 8 && callSeen) { lab = 'PENDING \u25B8'; state = 'pend'; }
   if (G.locked) lab = G.n === 8 && !decisiveSent ? 'PENDING' : lab;
   for (const c of ['tx', 'listen', 'pend']) pr.classList.toggle(c, c === state);
-  pr.classList.toggle('pulse', G.tut === 2 || G.tut === 3);
+  pr.classList.toggle('pulse', (G.tut === 2 && !G.beat) || G.tut === 3);
   pr.disabled = !!(G.locked || G.won);
   setText('primary', lab);
   const ff = $('ff');
@@ -531,7 +646,8 @@ function renderLogLine(fresh) {
 let coachOpts = {};
 function setCoach(text, opts = {}) {
   const c = $('coach'); coachOpts = opts;
-  c.innerHTML = (opts.kicker ? `<span class="kick">${esc(opts.kicker)}</span>` : '') + esc(text) + (opts.tap ? '<span class="more">TAP TO CONTINUE</span>' : opts.dismiss ? '<span class="more">TAP TO DISMISS</span>' : '');
+  c.classList.remove('snug');
+  c.innerHTML = (opts.kicker ? `<span class="kick">${esc(opts.kicker)}</span>` : '') + (opts.lead ? `<b class="lead">${esc(opts.lead)}</b> ` : '') + esc(text) + (opts.tap && !opts.quiet ? '<span class="more">TAP TO CONTINUE</span>' : opts.dismiss ? '<span class="more">TAP TO DISMISS</span>' : '');
   c.classList.remove('hidden'); c.classList.toggle('tap', !!(opts.tap || opts.dismiss));
 }
 function clearCoach() { $('coach').classList.add('hidden'); coachOpts = {}; }
@@ -682,7 +798,10 @@ function openCodex() {
 function openScale() {
   unlockCodex('dilation');
   openSheet(`<h2><span class="k">How light works here</span>Scale</h2>${TEXT.scale.map((t) => `<p>${esc(t)}</p>`).join('')}
-  <p class="tagline">Orders: tap a drone, then tap a hex to move it there.${G.n >= 3 && G.n <= 4 ? ' FLASH makes it signal the moment the order arrives.' : ''}${actOf(G.n) === 2 ? ' ASK sends a request addressed to one watcher. Tap Home to ask from Home.' : ''}</p>`);
+  <p class="tagline">Orders: tap a drone, then tap a hex to move it there.${G.n >= 3 && G.n <= 4 ? ' FLASH makes it signal the moment the order arrives.' : ''}${actOf(G.n) === 2 ? ' ASK sends a request addressed to one watcher. Tap Home to ask from Home.' : ''}</p>
+  ${canBeat() ? '<div class="btnrow"><button id="sBeat">Watch an order travel</button></div>' : ''}`, (el) => {
+    const b = el.querySelector('#sBeat'); if (b) b.onclick = () => { closeSheet(); replayBeat(); };
+  });
 }
 function openObjective() {
   const L = G.L;
