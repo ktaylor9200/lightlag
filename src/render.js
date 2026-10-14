@@ -4,8 +4,9 @@
 const COL = {
   bg: '#050a17', home: '#fff3d6', drone: '#f3d68c', der: '#aab0ba', relay: '#4fd8c8', wat: '#b993ff',
   world: '#a8d2ff', amber: '#ffb547', order: '255,238,206', ask: '196,160,255', flash: '243,214,140', reply: '170,240,200',
-  text: '#dfe6f2', dim: 'rgba(200,215,240,0.55)',
+  text: '#dfe6f2', dim: 'rgba(200,215,240,0.55)', sign: '#7cf0b0', object: '#ff8a8a',
 };
+const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 const SQ3 = Math.sqrt(3);
 const FDIRS = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
 
@@ -30,6 +31,8 @@ function makeGeom(w, h, R) {
 }
 
 const ease = (p) => p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+const easeOut = (p) => 1 - Math.pow(1 - p, 3);
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
 const lerp = (a, b, t) => a + (b - a) * t;
 function mixColor(a, b, t) { return a.map((v, i) => Math.round(lerp(v, b[i], t))); }
 
@@ -47,27 +50,36 @@ function frontPath(ctx, g, c, r) {
   });
   ctx.closePath();
 }
-
-function pill(ctx, x, y, text, color, alpha = 1, fs = 11) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.font = `600 ${fs}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
-  const w = ctx.measureText(text).width + 10, h = fs + 6;
-  ctx.fillStyle = 'rgba(5,10,23,0.86)'; ctx.strokeStyle = color; ctx.lineWidth = 1;
-  roundRect(ctx, x - w / 2, y - h / 2, w, h, h / 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, x, y + 0.5);
-  ctx.restore();
-}
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
-function sparkle(ctx, x, y, s, color, a) {
+// text with a dark halo so it stays legible over hexes, fronts and tracks
+function haloText(ctx, text, x, y, color, halo = 'rgba(5,10,23,0.9)', lw = 3) {
+  ctx.lineJoin = 'round'; ctx.strokeStyle = halo; ctx.lineWidth = lw; ctx.strokeText(text, x, y);
+  ctx.fillStyle = color; ctx.fillText(text, x, y);
+}
+function sparkle(ctx, x, y, s, color, a, rot = 0) {
   ctx.save(); ctx.globalAlpha = a; ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
   ctx.beginPath();
-  for (let i = 0; i < 4; i++) { const an = i * Math.PI / 4; ctx.moveTo(x + Math.cos(an) * s * 0.25, y + Math.sin(an) * s * 0.25); ctx.lineTo(x + Math.cos(an) * s, y + Math.sin(an) * s); ctx.moveTo(x - Math.cos(an) * s * 0.25, y - Math.sin(an) * s * 0.25); ctx.lineTo(x - Math.cos(an) * s, y - Math.sin(an) * s); }
+  for (let i = 0; i < 4; i++) {
+    const an = i * Math.PI / 4 + rot, k = i % 2 ? 0.6 : 1;
+    ctx.moveTo(x + Math.cos(an) * s * 0.25, y + Math.sin(an) * s * 0.25); ctx.lineTo(x + Math.cos(an) * s * k, y + Math.sin(an) * s * k);
+    ctx.moveTo(x - Math.cos(an) * s * 0.25, y - Math.sin(an) * s * 0.25); ctx.lineTo(x - Math.cos(an) * s * k, y - Math.sin(an) * s * k);
+  }
   ctx.stroke(); ctx.restore();
+}
+// an event landing: a ring that opens and settles, plus short rays while it moves
+function burst(ctx, x, y, s, color, po, rays, settled) {
+  ctx.save(); ctx.strokeStyle = color; ctx.lineCap = 'round';
+  ctx.globalAlpha = po >= 1 ? settled : Math.max(settled, 1 - 0.8 * po); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x, y, s * (0.55 + 0.75 * po), 0, 7); ctx.stroke();
+  if (rays && po < 1) {
+    ctx.globalAlpha = 1 - po; ctx.lineWidth = 1.6; ctx.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8, r0 = s * (0.7 + 0.5 * po), r1 = r0 + s * 0.35 * (1 - po * 0.5); ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0); ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1); }
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function droneShape(ctx, x, y, s) {
@@ -110,12 +122,101 @@ function interp(F, g, key) {
   return { x: lerp(A[0], B[0], p), y: lerp(A[1], B[1], p), hex: b, alpha: 1 };
 }
 
+// Ring-age labels go on the spoke that the level leaves most empty.
+// (diagonal spokes only: on a horizontal spoke the labels run into each other)
+const SPOKES = [[-1, 1], [0, 1], [0, -1], [1, -1]];
+const spokeCache = new WeakMap();
+function ringSpoke(F) {
+  const L = F.level;
+  if (spokeCache.has(L)) return spokeCache.get(L);
+  const occ = new Set(), add = (p) => { if (p) occ.add(p[0] + ',' + p[1]); };
+  for (const key in F.res.hist) {
+    if (key.startsWith('wat:')) continue;
+    const h = F.res.hist[key];
+    for (const t in h) if (+t >= -6 && +t <= 14) add(h[t]); // the opening years matter most
+  }
+  for (const w of L.watchers || []) if (!w.hidden) { add(w.pos); if (w.split) add(w.split.pos); }
+  for (const r of L.receivers || []) add(r.cell);
+  if (L.world) add(L.world.pos);
+  if (L.standing) add(L.standing.target);
+  let best = SPOKES[0], bs = Infinity;
+  const pref = [0, 0.1, 0.6, 0.7]; // quiet labels belong low on the board
+  for (const [i, d] of SPOKES.entries()) {
+    let sc = pref[i];
+    for (let k = 1; k <= L.R; k++) {
+      if (occ.has(d[0] * k + ',' + d[1] * k)) sc += k === 1 ? 3 : 1;
+      if (occ.has(d[0] * k + ',' + (d[1] * k + 1))) sc += 0.25; // the hex just below the label
+    }
+    if (sc < bs) { bs = sc; best = d; }
+  }
+  spokeCache.set(L, best);
+  return best;
+}
+
+// Greedy placement for pills (arrival tags, ages): try a few spots around the
+// anchor and keep the one that overlaps least with objects and other pills.
+function rectOverlap(a, b) {
+  const x = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), y = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return x > 0 && y > 0 ? x * y / Math.max(1, Math.min(a.w * a.h, b.w * b.h)) : 0;
+}
+function layoutPills(ctx, g, pills, occ) {
+  const placed = [];
+  pills.map((p, i) => [p, i]).sort((a, b) => b[0].prio - a[0].prio || a[1] - b[1]).forEach(([it]) => {
+    ctx.font = `600 ${it.fs}px ${FONT}`;
+    const w = Math.ceil(ctx.measureText(it.text).width) + 12, h = Math.round(it.fs + 7), gp = it.gap;
+    const below = [0, gp + h / 2], above = [0, -(gp + h / 2)], right = [gp + w / 2 + 1, 0], left = [-(gp + w / 2 + 1), 0];
+    const below2 = [0, gp + h * 1.5 + 2], above2 = [0, -(gp + h * 1.5 + 2)];
+    const dr = [gp * 0.7 + w / 2, gp * 0.7 + h / 2], dl = [-(gp * 0.7 + w / 2), gp * 0.7 + h / 2];
+    const ur = [gp * 0.7 + w / 2, -(gp * 0.7 + h / 2)], ul = [-(gp * 0.7 + w / 2), -(gp * 0.7 + h / 2)];
+    const cands = it.prefer === 'above' ? [above, below, ur, ul, right, left, above2, below2, dr, dl]
+      : [below, above, dr, dl, right, left, below2, above2, ur, ul];
+    let best = null, bc = Infinity, bi = 0;
+    cands.forEach(([dx, dy], i) => {
+      const r = { x: Math.round(it.x + dx - w / 2), y: Math.round(it.y + dy - h / 2), w, h };
+      let c = i * 0.15;
+      if (r.x < 1 || r.y < 1 || r.x + w > g.w - 1 || r.y + h > g.h - 1) c += 30;
+      for (const p of placed) c += 14 * rectOverlap(r, p);
+      for (const o of occ) c += o.wt * rectOverlap(r, o);
+      if (c < bc) { bc = c; best = r; bi = i; }
+    });
+    placed.push(best);
+    // a pill pushed off to the side keeps a thin leader to what it labels
+    if (bi >= 2) {
+      const qx = Math.max(best.x, Math.min(it.x, best.x + best.w)), qy = Math.max(best.y, Math.min(it.y, best.y + best.h));
+      const d = Math.hypot(qx - it.x, qy - it.y);
+      if (d > gp * 0.9) {
+        const ax = it.x + (qx - it.x) / d * gp * 0.8, ay = it.y + (qy - it.y) / d * gp * 0.8;
+        ctx.save(); ctx.globalAlpha = it.alpha * 0.55; ctx.strokeStyle = it.color; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(qx, qy); ctx.stroke(); ctx.restore();
+      }
+    }
+    drawPill(ctx, best, it);
+  });
+}
+function drawPill(ctx, r, it) {
+  ctx.save(); ctx.globalAlpha = it.alpha;
+  ctx.font = `600 ${it.fs}px ${FONT}`;
+  roundRect(ctx, r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1, r.h / 2);
+  ctx.fillStyle = it.quiet ? 'rgba(5,10,23,0.78)' : 'rgba(5,10,23,0.92)'; ctx.fill();
+  ctx.strokeStyle = it.color; ctx.globalAlpha = it.alpha * (it.quiet ? 0.45 : 1); ctx.lineWidth = 1; ctx.stroke();
+  ctx.globalAlpha = it.alpha; ctx.fillStyle = it.color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(it.text, r.x + r.w / 2, r.y + r.h / 2 + 0.5);
+  ctx.restore();
+}
+
 function render(ctx, g, F) {
-  const L = F.level, R = L.R, vt = F.now - 1 + F.p, s = g.size, T = F.clock || 0;
+  const L = F.level, R = L.R, s = g.size, T = F.clock || 0, RM = !!F.reduced;
   const seen = F.mode === 'seen';
+  const vt = F.now - 1 + F.p;                              // linear visual time
+  const po = F.p >= 1 ? 1 : easeOut(F.p), pe = F.p >= 1 ? 1 : ease(F.p);
+  const vf = F.now - 1 + po;                               // fronts ease out within each year
+  const osc = (per, ph = 0) => (RM ? 0 : Math.sin(T / per + ph));
+  const occ = [], pills = [];
+  const keep = (x, y, r, wt = 6) => occ.push({ x: x - r, y: y - r, w: 2 * r, h: 2 * r, wt });
+  const smallFs = Math.round(Math.max(10, Math.min(12, s * 0.46)));
   ctx.fillStyle = COL.bg; ctx.fillRect(0, 0, g.w, g.h);
   // stars
-  if (F.stars) { ctx.fillStyle = '#ffffff'; for (const st of F.stars) { ctx.globalAlpha = st[2] * (0.6 + 0.4 * Math.sin(T / 1300 + st[3])); ctx.fillRect(st[0] * g.w, st[1] * g.h, 1.2, 1.2); } ctx.globalAlpha = 1; }
+  if (F.stars) { ctx.fillStyle = '#ffffff'; for (const st of F.stars) { ctx.globalAlpha = st[2] * (0.6 + 0.4 * osc(1300, st[3])); ctx.fillRect(st[0] * g.w, st[1] * g.h, 1.2, 1.2); } ctx.globalAlpha = 1; }
   // hexes (warm at home, cool at rim)
   const warm = [44, 36, 30], cool = [12, 22, 40];
   for (const c of g.cells) {
@@ -126,37 +227,43 @@ function render(ctx, g, F) {
     ctx.fillStyle = `rgb(${m[0]},${m[1]},${m[2]})`; ctx.fill();
     ctx.strokeStyle = 'rgba(160,185,230,0.10)'; ctx.lineWidth = 1; ctx.stroke();
   }
-  // ring age labels on the lower-left spoke
+  // ring age labels on the emptiest spoke
   if (seen && !F.noLabels) {
-    ctx.save(); ctx.font = `500 ${Math.max(9, Math.min(11, s * 0.42))}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (let k = 0; k <= R; k++) {
-      const [x, y] = g.px(-k, k);
-      ctx.fillStyle = k === 0 ? 'rgba(255,240,215,0.0)' : `rgba(${mixColor([255, 236, 205], [150, 175, 215], k / R).join(',')},0.42)`;
-      if (k > 0) ctx.fillText(k === 1 ? '1 yr ago' : `${k} yrs`, x, y + s * 0.62);
+    const sp = ringSpoke(F), fs = Math.round(Math.max(10, Math.min(11.5, s * 0.44)));
+    ctx.save(); ctx.font = `500 ${fs}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let k = 1; k <= R; k++) {
+      const [x, y0] = g.px(sp[0] * k, sp[1] * k), y = y0 + s * 0.56;
+      const txt = k === 1 ? '1 yr ago' : `${k} yrs`, w = ctx.measureText(txt).width;
+      haloText(ctx, txt, x, y, `rgba(${mixColor([255, 236, 205], [150, 175, 215], k / R).join(',')},0.62)`, 'rgba(5,10,23,0.55)', 2.5);
+      occ.push({ x: x - w / 2, y: y - fs / 2, w, h: fs, wt: 1.2 });
     }
     ctx.restore();
   }
   // highlights (tutorial)
   for (const hl of F.ui.highlight || []) {
     const [x, y] = g.px(hl[0], hl[1]);
-    ctx.save(); ctx.globalAlpha = 0.45 + 0.35 * Math.sin(T / 220);
-    hexPath(ctx, x, y, s * 0.92); ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.globalAlpha = RM ? 0.8 : 0.5 + 0.35 * osc(240);
+    hexPath(ctx, x, y, s * 0.92); ctx.fillStyle = 'rgba(255,243,214,0.08)'; ctx.fill();
+    ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.restore();
   }
 
-  // ---------- fronts ----------
-  ctx.save(); ctx.lineWidth = 1.6;
+  // ---------- fronts (clipped to the board) ----------
+  let txFlash = 0;
+  ctx.save();
+  frontPath(ctx, g, SIM.HOME, R + 0.62); ctx.clip();
   for (const pu of F.res.pulses) {
     if (pu.t > vt) continue;
-    const r = vt - pu.t;
-    if (r > R + 1.5) continue;
-    let calc = true;
-    if (pu.standing) { if (seen && vt < pu.t + SIM.ring(pu.src)) continue; }
+    const r = vf - pu.t;
+    if (r < 0 || r > R + 1.6) continue;
+    if (pu.standing && seen && vt < pu.t + SIM.ring(pu.src)) continue;
+    if (pu.from === 'HOME' && pu.t === F.now - 1 && F.p < 1) txFlash = Math.max(txFlash, 1 - po); // TRANSMIT acknowledged
     const rgb = pu.kind === 'order' ? COL.order : pu.to ? COL.ask : COL.flash;
-    const a = Math.max(0, Math.min(1, (R + 1.5 - r) / 1.5)) * (pu.kind === 'order' ? 0.55 : 0.85);
-    ctx.strokeStyle = `rgba(${rgb},${a})`;
-    ctx.setLineDash(seen && calc ? [5, 5] : []);
-    frontPath(ctx, g, pu.src, Math.max(0.02, r)); ctx.stroke();
-    if (!seen) { ctx.strokeStyle = `rgba(${rgb},${a * 0.25})`; ctx.lineWidth = 5; ctx.stroke(); ctx.lineWidth = 1.6; }
+    const a = clamp01((R + 0.9 - r) / 1.4) * (pu.kind === 'order' ? 0.6 : 0.88);
+    const rr = Math.max(0.02, r);
+    // soft glow under the leading edge while it moves
+    frontPath(ctx, g, pu.src, rr);
+    ctx.setLineDash([]); ctx.strokeStyle = `rgba(${rgb},${a * (seen ? 0.12 : 0.22)})`; ctx.lineWidth = seen ? 4 : 6; ctx.stroke();
+    ctx.setLineDash(seen ? [5, 5] : []); ctx.strokeStyle = `rgba(${rgb},${a})`; ctx.lineWidth = 1.6; ctx.stroke();
   }
   ctx.setLineDash([]);
   // true mode: the news of each objective event travelling home
@@ -164,31 +271,70 @@ function render(ctx, g, F) {
     for (const e of F.newsEvents) {
       const r = vt - e.t, d = SIM.ring(e.pos);
       if (r < 0 || r > d + 0.3) continue;
-      ctx.strokeStyle = 'rgba(255,243,214,0.9)'; ctx.lineWidth = 2.2; frontPath(ctx, g, e.pos, Math.max(0.02, r)); ctx.stroke();
+      frontPath(ctx, g, e.pos, Math.max(0.02, r));
+      ctx.strokeStyle = 'rgba(255,243,214,0.18)'; ctx.lineWidth = 7; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,243,214,0.95)'; ctx.lineWidth = 2.2; ctx.stroke();
     }
   }
   ctx.restore();
 
   // ---------- finale world ----------
-  if (F.fin) drawWorld(ctx, g, F, vt);
+  if (F.fin) drawWorld(ctx, g, F, vt, { osc, keep, pills, RM, po, smallFs });
 
-  // ---------- derelict tracks + projections (seen mode) ----------
+  // ---------- drone positions (seen ghost + calculated) ----------
+  const dpos = {};
+  for (const id of Object.keys(L.drones || {})) {
+    const key = 'drone:' + id;
+    const gh = interp(F, g, key);
+    let calc = null;
+    if (seen) {
+      const indep = F.fin && F.fin.standingAt !== null && F.now >= F.fin.standingAt;
+      const tp = F.res.hist[key][F.now];
+      if (tp && !indep) {
+        const pa = F.p < 1 ? F.res.hist[key][F.now - 1] : null;
+        let [x, y] = g.px(tp[0], tp[1]);
+        if (pa) { const [x0, y0] = g.px(pa[0], pa[1]); x = lerp(x0, x, pe); y = lerp(y0, y, pe); }
+        calc = { x, y };
+      }
+    }
+    dpos[id] = { gh, calc };
+  }
+  // queued / in-flight move lines and target reticles (under the objects)
+  for (const t of F.ui.moveLines || []) {
+    const d = dpos[t.who], from = d && (d.calc || d.gh);
+    if (!from) continue;
+    const [x, y] = g.px(t.target[0], t.target[1]);
+    ctx.save(); ctx.strokeStyle = t.queued ? 'rgba(243,214,140,0.95)' : 'rgba(243,214,140,0.5)'; ctx.lineWidth = 1.5;
+    const ang = Math.atan2(y - from.y, x - from.x), rr = s * 0.68, len = Math.hypot(x - from.x, y - from.y);
+    if (len > rr + 2) { ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(x - Math.cos(ang) * rr, y - Math.sin(ang) * rr); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.beginPath();
+    for (let i = 0; i < 4; i++) { const a0 = i * Math.PI / 2 + Math.PI / 4; ctx.moveTo(x + Math.cos(a0 - 0.42) * rr, y + Math.sin(a0 - 0.42) * rr); ctx.arc(x, y, rr, a0 - 0.42, a0 + 0.42); }
+    ctx.stroke();
+    ctx.restore();
+    keep(x, y, s * 0.72, 3);
+  }
+
+  // ---------- derelict tracks + projections (seen mode; year ticks read over the reticles) ----------
   for (const d of L.derelicts || []) {
     const unlocked = seen && F.unlock[d.id] !== null && F.unlock[d.id] !== undefined && F.now >= F.unlock[d.id];
     if (!unlocked) continue;
     const tp = F.res.hist['der:' + d.id][F.now];
     if (!tp || (F.exitTrue[d.id] !== undefined && F.now >= F.exitTrue[d.id])) continue;
     const fut = derFuture(d, F.now, R);
-    let [px0, py0] = g.px(tp[0], tp[1]);
+    const [px0, py0] = g.px(tp[0], tp[1]);
+    const fresh = F.now === F.unlock[d.id] ? pe : 1; // the track draws itself in on the unlock year
     ctx.save(); ctx.setLineDash([2, 5]); ctx.strokeStyle = 'rgba(190,198,210,0.55)'; ctx.lineWidth = 1.5;
+    ctx.globalAlpha = fresh;
     ctx.beginPath(); ctx.moveTo(px0, py0);
     for (const f of fut) { const [x, y] = g.px(f.pos[0], f.pos[1]); ctx.lineTo(x, y); }
     ctx.stroke(); ctx.setLineDash([]);
-    ctx.font = `600 ${Math.max(9, Math.min(11, s * 0.42))}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `600 ${smallFs - 1}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const f of fut) {
       const [x, y] = g.px(f.pos[0], f.pos[1]);
-      ctx.fillStyle = 'rgba(200,206,216,0.8)'; ctx.beginPath(); ctx.arc(x, y, 2, 0, 7); ctx.fill();
-      ctx.fillStyle = 'rgba(200,206,216,0.62)'; ctx.fillText('yr ' + f.t, x, y + s * 0.5);
+      ctx.fillStyle = 'rgba(200,206,216,0.85)'; ctx.beginPath(); ctx.arc(x, y, 2, 0, 7); ctx.fill();
+      const txt = 'yr ' + f.t, ty = y + s * 0.5, w = ctx.measureText(txt).width;
+      haloText(ctx, txt, x, ty, 'rgba(206,212,222,0.8)', 'rgba(5,10,23,0.85)', 3);
+      occ.push({ x: x - w / 2, y: ty - smallFs / 2, w, h: smallFs, wt: 2 });
     }
     ctx.restore();
   }
@@ -204,7 +350,8 @@ function render(ctx, g, F) {
     ctx.beginPath(); ctx.rect(x - s * 0.36, y - s * 0.36, s * 0.72, s * 0.72); ctx.fill(); ctx.stroke();
     ctx.restore();
     label(ctx, x, y, rc.id, on ? '#032' : COL.relay, s);
-    needDots(ctx, x, y + s * 0.62, rc.need, s);
+    needDots(ctx, x, y + s * 0.6, rc.need, s);
+    keep(x, y, s * 0.5);
   }
 
   // ---------- derelicts (seen images, solid) ----------
@@ -217,12 +364,13 @@ function render(ctx, g, F) {
     ctx.strokeStyle = '#d6dae0'; ctx.lineWidth = 1; ctx.stroke();
     ctx.restore();
     const ride = (L.receivers || []).find((r) => r.ride === d.id);
-    if (ride) { const on = relayOn(F, ride.id); ctx.save(); ctx.globalAlpha = o.alpha; ctx.strokeStyle = COL.relay; ctx.lineWidth = on ? 3 : 2; if (on) { ctx.shadowColor = COL.relay; ctx.shadowBlur = 16; } ctx.beginPath(); ctx.arc(o.x, o.y, s * 0.6, 0, 7); ctx.stroke(); ctx.restore(); needDots(ctx, o.x, o.y + s * 0.82, ride.need, s); }
+    if (ride) { const on = relayOn(F, ride.id); ctx.save(); ctx.globalAlpha = o.alpha; ctx.strokeStyle = COL.relay; ctx.lineWidth = on ? 3 : 2; if (on) { ctx.shadowColor = COL.relay; ctx.shadowBlur = 16; } ctx.beginPath(); ctx.arc(o.x, o.y, s * 0.6, 0, 7); ctx.stroke(); ctx.restore(); needDots(ctx, o.x, o.y + s * 0.8, ride.need, s); }
     label(ctx, o.x, o.y, d.id, '#1a1d22', s * 0.85);
     if (tagged) { ctx.save(); ctx.strokeStyle = COL.drone; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(o.x, o.y, s * 0.55, 0, 7); ctx.stroke(); ctx.restore(); }
+    keep(o.x, o.y, s * (ride ? 0.66 : 0.48));
     if (seen && !F.noLabels) {
       const sp = SIM.seenPos(F.res.hist['der:' + d.id], F.now);
-      if (sp) { const age = F.now - sp[0]; pill(ctx, o.x, o.y - s * 0.95, age <= 0 ? 'now' : `${age} yr${age === 1 ? '' : 's'} ago`, 'rgba(200,206,216,0.9)', 0.9 * o.alpha, Math.max(9, Math.min(11, s * 0.42))); }
+      if (sp) { const age = F.now - sp[0]; pills.push({ x: o.x, y: o.y, gap: s * (ride ? 0.66 : 0.5), text: age <= 0 ? 'now' : `${age} yr${age === 1 ? '' : 's'} ago`, color: 'rgba(206,212,222,0.95)', alpha: 0.9 * o.alpha, fs: smallFs - 1, prio: 1, prefer: 'above', quiet: true }); }
     }
   }
   // projection NOW markers (dashed = calculated)
@@ -233,14 +381,19 @@ function render(ctx, g, F) {
     if (!tp) continue;
     const pa = F.p < 1 ? F.res.hist['der:' + d.id][F.now - 1] : null;
     let [x, y] = g.px(tp[0], tp[1]);
-    if (pa) { const [x0, y0] = g.px(pa[0], pa[1]); x = lerp(x0, x, ease(F.p)); y = lerp(y0, y, ease(F.p)); }
-    const fresh = F.now === F.unlock[d.id] ? 1 + 0.25 * Math.sin(T / 160) : 1;
-    ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = '#e4e8ee'; ctx.lineWidth = 1.6;
-    derShape(ctx, x, y, s * 0.42 * fresh); ctx.stroke();
+    if (pa) { const [x0, y0] = g.px(pa[0], pa[1]); x = lerp(x0, x, pe); y = lerp(y0, y, pe); }
+    const first = F.now === F.unlock[d.id];
+    const sc = first ? (F.p < 1 ? 1.8 - 0.8 * po : 1 + 0.12 * osc(160)) : 1; // snaps in on the unlock year
+    ctx.save(); ctx.globalAlpha = first ? Math.max(0.15, pe) : 1;
+    ctx.setLineDash([4, 3]); ctx.strokeStyle = '#e4e8ee'; ctx.lineWidth = 1.6;
+    derShape(ctx, x, y, s * 0.42 * sc); ctx.stroke();
     const ride = (L.receivers || []).find((r) => r.ride === d.id);
     if (ride) { ctx.strokeStyle = COL.relay; ctx.beginPath(); ctx.arc(x, y, s * 0.6, 0, 7); ctx.stroke(); }
+    ctx.setLineDash([]);
+    ctx.font = `800 ${Math.round(Math.max(9, Math.min(10.5, s * 0.4)))}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    haloText(ctx, 'NOW', x, y + 0.5, '#f1f4f8', 'rgba(5,10,23,0.95)', 3);
     ctx.restore();
-    ctx.save(); ctx.font = `700 ${Math.max(9, Math.min(10, s * 0.4))}px system-ui, sans-serif`; ctx.fillStyle = '#e4e8ee'; ctx.textAlign = 'center'; ctx.fillText('NOW', x, y + s * 0.2); ctx.restore();
+    keep(x, y, s * (ride ? 0.66 : 0.48));
   }
 
   // ---------- watchers ----------
@@ -251,118 +404,135 @@ function render(ctx, g, F) {
       if (w.born > 0 && w.born + SIM.ring(w.pos) > F.now) continue;
     } else if (w.born > F.now) continue;
     if (hidden) continue;
+    let ra = 1;
+    if (w.hidden && F.reveal) { const r0 = F.reveal[w.id]; if (r0 === undefined || vt < r0) continue; ra = clamp01((vt - r0) / 0.8); }
     const [x, y] = g.px(w.pos[0], w.pos[1]);
     const signed = eventSeen(F, (e) => e.type === 'sign' && e.data === w.id);
     const off = eventSeen(F, (e) => e.type === 'offended' && e.data === w.id);
     const fresh = seen && w.born > 0 && w.born + SIM.ring(w.pos) === F.now;
     ctx.save();
-    if (fresh) ctx.globalAlpha = F.p;
+    ctx.globalAlpha = (fresh ? pe : 1) * ra;
+    if (w.hidden && F.reveal) { ctx.strokeStyle = 'rgba(185,147,255,0.5)'; ctx.lineWidth = 1.5; hexPath(ctx, x, y, s * (0.92 + 0.5 * (1 - ra))); ctx.stroke(); }
     watShape(ctx, x, y, s * 0.46);
     ctx.fillStyle = w.kind === 'mirror' ? 'rgba(185,147,255,0.35)' : COL.wat; ctx.fill();
     ctx.strokeStyle = '#e1d2ff'; ctx.lineWidth = 1.2; ctx.stroke();
-    if (w.kind === 'precedent') { ctx.strokeStyle = 'rgba(225,210,255,0.8)'; ctx.setLineDash([]); watShape(ctx, x, y, s * 0.62); ctx.stroke(); }
+    if (w.kind === 'precedent') { ctx.strokeStyle = 'rgba(225,210,255,0.8)'; watShape(ctx, x, y, s * 0.62); ctx.stroke(); }
     ctx.restore();
-    if (w.kind !== 'mirror') label(ctx, x, y, w.id === 'R2' ? 'R\u2032' : w.id, '#1b0f33', s * 0.85);
-    if (signed) badge(ctx, x + s * 0.48, y - s * 0.45, '\u2713', '#7cf0b0', s);
-    if (off) badge(ctx, x + s * 0.48, y - s * 0.45, '\u2715', '#ff8a8a', s);
+    if (w.kind !== 'mirror') label(ctx, x, y, w.id === 'R2' ? 'R′' : w.id, '#1b0f33', s * 0.85);
+    const pop = (e) => (e && (seen ? SIM.seenTick(e) : e.t) === F.now && F.p < 1 ? 1 + 0.7 * (1 - po) : 1);
+    if (signed) badge(ctx, x + s * 0.5, y - s * 0.46, '✓', COL.sign, s * pop(signed));
+    if (off) badge(ctx, x + s * 0.5, y - s * 0.46, '✕', COL.object, s * pop(off));
+    keep(x, y, s * (w.kind === 'precedent' ? 0.64 : 0.5));
   }
 
   // ---------- events (pops) ----------
   const evNow = (e) => seen ? SIM.seenTick(e) === F.now : e.t === F.now;
-  const popA = F.p < 1 ? (1 - Math.abs(F.p * 2 - 1) * 0.3) : 0.55 + 0.25 * Math.sin(T / 300);
+  const steady = F.p < 1 ? 1 : (RM ? 0.75 : 0.55 + 0.25 * osc(300));
   for (const e of F.res.events) {
+    if (e.type === 'order_rx' && seen && e.t === F.now) {
+      // Home calculates the moment its order lands: a dashed tick around the drone
+      const d = dpos[e.data[0]], c = d && d.calc;
+      if (!c) continue;
+      ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = COL.drone; ctx.lineWidth = 1.6;
+      ctx.globalAlpha = F.p < 1 ? 1 - 0.75 * po : 0.25;
+      ctx.beginPath(); ctx.arc(c.x, c.y, s * (0.62 + 0.45 * po), 0, 7); ctx.stroke(); ctx.restore();
+      continue;
+    }
     if (!evNow(e)) continue;
     const [x, y] = g.px(e.pos[0], e.pos[1]);
     if (e.type === 'glint') {
       const w = F.res.wat.find((q) => q.id === e.data);
-      sparkle(ctx, x, y, s * (0.35 + 0.25 * F.p), w && w.hidden && !F.showHidden ? '#d9c8ff' : '#f0e6ff', popA * (w && w.hidden && !F.showHidden ? 0.75 : 1));
-    } else if (e.type === 'tag' || e.type === 'rec_on' || e.type === 'sign') {
-      ctx.save(); ctx.globalAlpha = Math.max(0, 1 - F.p * 0.7); ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(x, y, s * (0.5 + F.p * 0.9), 0, 7); ctx.stroke(); ctx.restore();
-    } else if (e.type === 'offended') {
-      ctx.save(); ctx.globalAlpha = Math.max(0, 1 - F.p * 0.7); ctx.strokeStyle = '#ff8a8a'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(x, y, s * (0.5 + F.p * 0.9), 0, 7); ctx.stroke(); ctx.restore();
-    } else if (e.type === 'flash') {
+      const faint = w && w.hidden && !F.showHidden;
+      sparkle(ctx, x, y, s * (0.32 + 0.28 * po), faint ? '#d9c8ff' : '#f0e6ff', steady * (faint ? 0.75 : 1), RM ? 0 : po * 0.5);
+    } else if (e.type === 'tag') burst(ctx, x, y, s, COL.drone, po, true, 0.3);
+    else if (e.type === 'rec_on') burst(ctx, x, y, s, COL.relay, po, true, 0.3);
+    else if (e.type === 'sign') burst(ctx, x, y, s, COL.sign, po, false, 0.25);
+    else if (e.type === 'offended') burst(ctx, x, y, s, COL.object, po, false, 0.25);
+    else if (e.type === 'flash') {
       if (seen && e.pos[0] === 0 && e.pos[1] === 0) continue;
-      ctx.save(); ctx.globalAlpha = popA; ctx.fillStyle = e.data[1] ? 'rgba(196,160,255,0.5)' : 'rgba(243,214,140,0.55)';
-      ctx.beginPath(); ctx.arc(x, y, s * 0.5, 0, 7); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.globalAlpha = steady; ctx.fillStyle = e.data[1] ? 'rgba(196,160,255,0.5)' : 'rgba(243,214,140,0.55)';
+      ctx.beginPath(); ctx.arc(x, y, s * (0.5 + (F.p < 1 ? 0.25 * (1 - po) : 0)), 0, 7); ctx.fill(); ctx.restore();
     }
   }
 
   // ---------- drones ----------
   for (const id of Object.keys(L.drones || {})) {
-    const key = 'drone:' + id;
-    const gh = interp(F, g, key);
-    let calc = null;
-    if (seen) {
-      const indep = F.fin && F.fin.standingAt !== null && F.now >= F.fin.standingAt;
-      const tp = F.res.hist[key][F.now];
-      if (tp && !indep) {
-        const pa = F.p < 1 ? F.res.hist[key][F.now - 1] : null;
-        let [x, y] = g.px(tp[0], tp[1]);
-        if (pa) { const [x0, y0] = g.px(pa[0], pa[1]); x = lerp(x0, x, ease(F.p)); y = lerp(y0, y, ease(F.p)); }
-        calc = { x, y };
-      }
-    }
-    // queued / in-flight move lines
-    for (const t of F.ui.moveLines || []) {
-      if (t.who !== id) continue;
-      const from = calc || gh; if (!from) continue;
-      const [x, y] = g.px(t.target[0], t.target[1]);
-      ctx.save(); ctx.setLineDash([3, 4]); ctx.strokeStyle = t.queued ? 'rgba(243,214,140,0.9)' : 'rgba(243,214,140,0.45)'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.beginPath(); ctx.arc(x, y, s * 0.3, 0, 7); ctx.moveTo(x - s * 0.45, y); ctx.lineTo(x + s * 0.45, y); ctx.moveTo(x, y - s * 0.45); ctx.lineTo(x, y + s * 0.45); ctx.stroke();
-      ctx.restore();
-    }
-    if (calc && gh && (Math.abs(calc.x - gh.x) > 1 || Math.abs(calc.y - gh.y) > 1)) {
+    const { gh, calc } = dpos[id];
+    const apart = calc && gh && (Math.abs(calc.x - gh.x) > 1 || Math.abs(calc.y - gh.y) > 1);
+    if (apart) {
       ctx.save(); ctx.strokeStyle = 'rgba(243,214,140,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(gh.x, gh.y); ctx.lineTo(calc.x, calc.y); ctx.stroke(); ctx.restore();
     }
     if (gh) {
-      ctx.save(); ctx.globalAlpha = gh.alpha * (calc && (Math.abs(calc.x - gh.x) > 1 || Math.abs(calc.y - gh.y) > 1) ? 0.7 : 1);
+      ctx.save(); ctx.globalAlpha = gh.alpha * (apart ? 0.7 : 1);
       droneShape(ctx, gh.x, gh.y + s * 0.05, s * 0.5); ctx.fillStyle = COL.drone; ctx.fill(); ctx.restore();
       label(ctx, gh.x, gh.y + s * 0.12, id, '#2a2000', s * 0.8);
+      keep(gh.x, gh.y, s * 0.55);
     }
     if (calc) {
       ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = COL.drone; ctx.lineWidth = 1.6;
       droneShape(ctx, calc.x, calc.y + s * 0.05, s * 0.62); ctx.stroke(); ctx.restore();
+      if (apart) label(ctx, calc.x, calc.y + s * 0.14, id, 'rgba(243,214,140,0.85)', s * 0.62);
+      keep(calc.x, calc.y, s * 0.62);
     }
     if (F.ui.selected === id) {
-      const c = calc || gh; if (c) { ctx.save(); ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2; ctx.globalAlpha = 0.6 + 0.4 * Math.sin(T / 200); ctx.beginPath(); ctx.arc(c.x, c.y, s * 0.85, 0, 7); ctx.stroke(); ctx.restore(); }
+      const c = calc || gh;
+      if (c) { ctx.save(); ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2; ctx.globalAlpha = RM ? 0.9 : 0.65 + 0.35 * osc(200); ctx.beginPath(); ctx.arc(c.x, c.y, s * 0.88, 0, 7); ctx.stroke(); ctx.restore(); keep(c.x, c.y, s * 0.9, 2); }
     }
   }
 
   // ---------- home ----------
   {
     const [x, y] = g.px(0, 0);
+    const conf = F.confirm && F.now === F.confirm.at ? F.confirm : null;
+    // the light of the confirming event has just reached Home
+    if (conf) {
+      ctx.save();
+      for (const pt of conf.pts) {
+        const [ex, ey] = g.px(pt[0], pt[1]);
+        const gr = ctx.createLinearGradient(ex, ey, x, y);
+        const a = F.p < 1 ? 0.25 + 0.75 * po : (RM ? 0.6 : 0.5 + 0.15 * osc(420));
+        gr.addColorStop(0, `rgba(255,243,214,${0.1 * a})`); gr.addColorStop(1, `rgba(255,243,214,${0.85 * a})`);
+        ctx.strokeStyle = gr; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(x, y); ctx.stroke();
+      }
+      if (F.p < 1) { ctx.strokeStyle = `rgba(255,243,214,${1 - po})`; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, s * (0.5 + 2.6 * po), 0, 7); ctx.stroke(); }
+      ctx.restore();
+    }
+    const glow = 1 + (conf ? 0.6 : 0) + 0.9 * txFlash;
     ctx.save();
-    const gr = ctx.createRadialGradient(x, y, 0, x, y, s * 1.3);
-    gr.addColorStop(0, 'rgba(255,243,214,0.55)'); gr.addColorStop(1, 'rgba(255,243,214,0)');
-    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, s * 1.3, 0, 7); ctx.fill();
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, s * 1.3 * glow);
+    gr.addColorStop(0, `rgba(255,243,214,${Math.min(0.9, 0.55 + 0.3 * txFlash)})`); gr.addColorStop(1, 'rgba(255,243,214,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, s * 1.3 * glow, 0, 7); ctx.fill();
     ctx.fillStyle = COL.home; ctx.beginPath(); ctx.arc(x, y, s * 0.3, 0, 7); ctx.fill();
     ctx.strokeStyle = 'rgba(255,243,214,0.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, s * 0.5, 0, 7); ctx.stroke();
-    if (F.ui.selected === 'HOME') { ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2; ctx.globalAlpha = 0.6 + 0.4 * Math.sin(T / 200); ctx.beginPath(); ctx.arc(x, y, s * 0.85, 0, 7); ctx.stroke(); }
+    if (F.ui.selected === 'HOME') { ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2; ctx.globalAlpha = RM ? 0.9 : 0.65 + 0.35 * osc(200); ctx.beginPath(); ctx.arc(x, y, s * 0.88, 0, 7); ctx.stroke(); }
     ctx.restore();
+    keep(x, y, s * 0.55);
   }
 
   // ---------- tags ----------
-  const fsz = Math.max(10, Math.min(12, s * 0.46));
-  const stack = {};
+  // identical tags on the same hex merge ("reaches yr 7 ×2" is the relay puzzle's answer)
+  const groups = new Map();
   for (const tg of F.ui.tags || []) {
-    const k = tg.pos.join(',');
-    const i = stack[k] = (stack[k] || 0) + 1;
-    const [x, y] = g.px(tg.pos[0], tg.pos[1]);
-    pill(ctx, x, y + s * (0.95 + 0.62 * (i - 1)) * (tg.up ? -1 : 1), tg.text, tg.color || COL.drone, tg.queued ? 1 : 0.75, fsz);
+    const k = tg.pos.join(',') + '|' + tg.text;
+    const gr = groups.get(k);
+    if (gr) { gr.n++; gr.queued = gr.queued || tg.queued; } else groups.set(k, { tg, n: 1, queued: !!tg.queued });
   }
+  const anyQueued = (F.ui.tags || []).some((t) => t.queued);
+  for (const { tg, n, queued } of groups.values()) {
+    const [x, y] = g.px(tg.pos[0], tg.pos[1]);
+    pills.push({ x, y, gap: s * 0.55, text: tg.text + (n > 1 ? ` ×${n}` : ''), color: tg.color || COL.drone, alpha: queued ? 1 : anyQueued ? 0.6 : 0.82, fs: smallFs, prio: queued ? 3 : 2, prefer: 'below' });
+  }
+  layoutPills(ctx, g, pills, occ);
 }
 
-function drawWorld(ctx, g, F, vt) {
-  const fin = F.fin, W = FIN.W, s = g.size, T = F.clock || 0, seen = F.mode === 'seen';
+function drawWorld(ctx, g, F, vt, K) {
+  const fin = F.fin, W = FIN.W, s = g.size, T = F.clock || 0, seen = F.mode === 'seen', { osc, RM } = K;
   const [x, y] = g.px(W[0], W[1]);
   const lag = seen ? FIN.WR : 0;
   const n = F.now;
   // leak halo: every year from true 1
   if (n - lag >= 1) {
-    ctx.save(); ctx.globalAlpha = 0.25 + 0.2 * Math.sin(T / 90) * Math.sin(T / 370);
+    ctx.save(); ctx.globalAlpha = RM ? 0.35 : 0.25 + 0.2 * osc(90) * osc(370);
     ctx.strokeStyle = COL.world; ctx.lineWidth = 1; ctx.setLineDash([1, 3]);
     ctx.beginPath(); ctx.arc(x, y, s * 0.95, 0, 7); ctx.stroke(); ctx.restore();
   }
@@ -370,16 +540,18 @@ function drawWorld(ctx, g, F, vt) {
   gr.addColorStop(0, '#e6f3ff'); gr.addColorStop(0.6, COL.world); gr.addColorStop(1, '#3a6aa8');
   ctx.save(); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, s * 0.52, 0, 7); ctx.fill();
   ctx.strokeStyle = 'rgba(200,230,255,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, s * 0.68, 0, 7); ctx.stroke(); ctx.restore();
+  K.keep(x, y, s * 0.72);
   // call this year
   if (fin.calls.includes(n - lag)) {
-    const ph = (T % 1600) / 1600;
+    const ph = RM ? 0.35 : (T % 1600) / 1600;
     ctx.save(); ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = 1 - ph; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, s * (0.6 + ph * 0.9), 0, 7); ctx.stroke(); ctx.restore();
-    blips(ctx, x, y - s * 1.15, [2, 3, 5, 7], '#ffffff', s, T);
+    blips(ctx, x, y - s * 1.2, [2, 3, 5, 7], '#ffffff', s, RM ? null : T);
+    K.keep(x, y - s * 1.05, s * 0.45, 4);
   }
   if (FIN.NOTYET.includes(n - lag)) {
-    const ph = ((T + 800) % 2000) / 2000;
+    const ph = RM ? 0.3 : ((T + 800) % 2000) / 2000;
     ctx.save(); ctx.strokeStyle = COL.amber; ctx.globalAlpha = (1 - ph) * 0.8; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, s * (0.55 + ph * 0.6), 0, 7); ctx.stroke(); ctx.restore();
-    pill(ctx, x - s * 1.6, y + s * 1.0, 'NOT YET', COL.amber, 0.9, Math.max(9, Math.min(11, s * 0.5)));
+    K.pills.push({ x, y, gap: s * 0.75, text: 'NOT YET', color: COL.amber, alpha: 0.95, fs: K.smallFs, prio: 1.5, prefer: 'below' });
   }
   // true-mode fronts from W: calls, not-yet, reply
   if (!seen) {
@@ -399,16 +571,19 @@ function drawWorld(ctx, g, F, vt) {
       const [px, py] = g.px(ps[1][0], ps[1][1]);
       ctx.save(); ctx.fillStyle = '#cfe6ff'; ctx.translate(px + s * 0.35, py + s * 0.3); ctx.rotate(Math.atan2(-py + g.cy, -px + g.cx) + Math.PI / 2);
       ctx.beginPath(); ctx.moveTo(0, -s * 0.3); ctx.lineTo(s * 0.2, s * 0.25); ctx.lineTo(-s * 0.2, s * 0.25); ctx.closePath(); ctx.fill(); ctx.restore();
+      K.keep(px + s * 0.35, py + s * 0.3, s * 0.35);
     }
   }
-  label(ctx, x, y + s * 1.05, 'W', COL.world, s * 0.9);
+  ctx.save(); ctx.font = `700 ${Math.round(Math.max(10, Math.min(13, s * 0.5)))}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  haloText(ctx, 'W', x, y + s * 0.98, COL.world); ctx.restore();
+  K.keep(x, y + s * 0.98, s * 0.3, 4);
 }
 
 function blips(ctx, x, y, groups, color, s, T) {
   const total = groups.reduce((a, b) => a + b, 0) + groups.length - 1;
   const w = s * 0.14; let i = 0;
   ctx.save(); ctx.fillStyle = color;
-  const lit = Math.floor((T / 90) % (total + 8));
+  const lit = T === null ? total : Math.floor((T / 90) % (total + 8));
   for (let gi = 0; gi < groups.length; gi++) {
     for (let k = 0; k < groups[gi]; k++) { ctx.globalAlpha = i <= lit ? 0.95 : 0.2; ctx.fillRect(x - total * w / 2 + i * w, y, w * 0.6, w * 1.6); i++; }
     i++;
@@ -417,17 +592,17 @@ function blips(ctx, x, y, groups, color, s, T) {
 }
 
 function label(ctx, x, y, text, color, s) {
-  ctx.save(); ctx.font = `700 ${Math.max(9, Math.min(14, s * 0.5))}px system-ui, sans-serif`; ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.save(); ctx.font = `700 ${Math.max(9, Math.min(14, s * 0.5))}px ${FONT}`; ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(text, x, y + 0.5); ctx.restore();
 }
 function badge(ctx, x, y, ch, color, s) {
-  ctx.save(); ctx.fillStyle = 'rgba(5,10,23,0.9)'; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+  ctx.save(); ctx.fillStyle = 'rgba(5,10,23,0.92)'; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.arc(x, y, s * 0.26, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = color; ctx.font = `800 ${Math.max(9, s * 0.34)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, x, y + 0.5); ctx.restore();
+  ctx.fillStyle = color; ctx.font = `800 ${Math.max(9, s * 0.34)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, x, y + 0.5); ctx.restore();
 }
 function needDots(ctx, x, y, n, s) {
   ctx.save(); ctx.fillStyle = COL.relay;
-  for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(x + (i - (n - 1) / 2) * s * 0.2, y, s * 0.06, 0, 7); ctx.fill(); }
+  for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(x + (i - (n - 1) / 2) * s * 0.2, y, Math.max(1.4, s * 0.06), 0, 7); ctx.fill(); }
   ctx.restore();
 }
 
