@@ -1,0 +1,2563 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>LIGHT LAG</title>
+<style>
+:root {
+  --bg: #050a17; --panel: #0c1428; --panel2: #121c35; --line: rgba(160,185,230,0.16);
+  --text: #dfe6f2; --body: #c9d3e6; --dim: #8e9bb5; --gold: #f3d68c; --home: #fff3d6; --violet: #b993ff; --teal: #4fd8c8;
+  --amber: #ffb547; --blue: #a8d2ff; --green: #c9f2dd;
+  --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px); --sar: env(safe-area-inset-right, 0px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
+body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; -webkit-user-select: none; user-select: none; touch-action: manipulation; overscroll-behavior: none; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; }
+button:disabled { cursor: default; opacity: 0.4; }
+button:focus-visible { outline: 2px solid rgba(255,243,214,0.6); outline-offset: 2px; }
+.hidden { display: none !important; }
+#app { position: fixed; inset: 0; display: flex; flex-direction: column; padding: var(--sat) var(--sar) var(--sab) var(--sal); max-width: 560px; margin: 0 auto; }
+
+/* top bar */
+#top { position: relative; height: 48px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 2px 0 14px; }
+#lvlname { flex: 1; min-width: 0; text-align: left; font-weight: 650; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 44px; letter-spacing: 0.01em; }
+#lvlname .n { color: var(--dim); font-weight: 500; margin-right: 7px; font-variant-numeric: tabular-nums; }
+#lvlname.tight { font-size: 14px; letter-spacing: 0; }
+#lvlname.tight .n { display: none; }
+#year { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1; min-width: 42px; font-variant-numeric: tabular-nums; }
+#year .k { font-size: 9.5px; letter-spacing: 0.2em; color: var(--dim); margin: 0 -0.2em 3px 0; }
+#year b { color: var(--home); font-size: 20px; font-weight: 700; display: inline-block; }
+#year b.roll { animation: roll 0.38s cubic-bezier(.2,.8,.3,1); }
+@keyframes roll { from { transform: translateY(-7px); opacity: 0.15; } to { transform: none; opacity: 1; } }
+#tickbar { position: absolute; left: 14px; right: 14px; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(255,243,214,0), rgba(255,243,214,0.55)); transform-origin: left center; transform: scaleX(1); opacity: 0; transition: opacity 0.6s ease; pointer-events: none; }
+#tickbar.on { opacity: 1; transition: none; }
+.iconbtn { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.iconbtn:active { background: var(--panel2); }
+.burger, .burger::before, .burger::after { display: block; width: 18px; height: 2px; border-radius: 1px; background: var(--text); position: relative; }
+.burger::before, .burger::after { content: ''; position: absolute; left: 0; }
+.burger::before { top: -6px; } .burger::after { top: 6px; }
+
+/* objective strip */
+#obj { flex: none; display: flex; align-items: center; gap: 10px; text-align: left; padding: 0 14px; min-height: 44px; color: var(--text); font-size: 15px; line-height: 1.3; }
+#objtext { flex: 1; min-width: 0; }
+#obj .i { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(160,185,230,0.35); color: var(--dim); font: italic 600 13px/20px Georgia, "Times New Roman", serif; text-align: center; }
+#obj:active .i { background: var(--panel2); color: var(--text); }
+
+/* board */
+#boardwrap { flex: 1 1 auto; min-height: 140px; position: relative; }
+#board { display: block; margin: 0 auto; touch-action: none; }
+#float { position: absolute; left: 10px; right: 10px; bottom: 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; z-index: 2; }
+#coach { pointer-events: auto; width: 100%; background: rgba(10,17,35,0.96); border: 1px solid rgba(255,243,214,0.28); border-left: 3px solid var(--home); color: var(--home); border-radius: 12px; padding: 10px 14px 10px 13px; font-size: 15px; line-height: 1.38; box-shadow: 0 8px 28px rgba(0,0,0,0.55); animation: rise 0.32s cubic-bezier(.2,.8,.3,1); }
+#coach .lead { color: var(--teal); font-weight: 650; }
+#coach.snug { font-size: 13px; line-height: 1.3; padding: 6px 10px 6px 10px; }
+#coach .kick { display: block; color: var(--teal); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 4px; }
+#coach .more { display: block; color: var(--dim); font-size: 11px; margin-top: 5px; letter-spacing: 0.14em; }
+#coach.tap { cursor: pointer; }
+#toast { background: rgba(18,28,53,0.97); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; font-size: 15px; color: var(--text); max-width: 100%; text-align: center; animation: rise 0.22s ease; box-shadow: 0 6px 20px rgba(0,0,0,0.45); }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* dock */
+#dock { flex: none; padding: 4px 10px 8px; display: flex; flex-direction: column; gap: 6px; }
+#log { display: flex; align-items: center; gap: 10px; text-align: left; height: 56px; padding: 0 10px 0 12px; border-radius: 12px; background: rgba(12,20,40,0.7); border: 1px solid var(--line); }
+#log .sym { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--home); opacity: 0.55; box-shadow: 0 0 6px rgba(255,243,214,0.5); }
+#log.fresh .sym { animation: ping 1.1s ease-out; }
+@keyframes ping { 0% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,243,214,0.7); } 100% { opacity: 0.55; box-shadow: 0 0 0 9px rgba(255,243,214,0); } }
+#logtext { flex: 1; min-width: 0; font-size: 15px; color: var(--body); line-height: 1.32; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#logtext.fresh { animation: fade 0.45s ease; }
+#logact:empty { display: none; }
+#logact { flex: none; }
+#logact button { min-height: 44px; padding: 0 12px; border-radius: 11px; background: var(--home); color: #1b1408; font-weight: 700; font-size: 14px; white-space: nowrap; animation: rise 0.3s ease; }
+#outbox, #chips { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; height: 44px; align-items: center; }
+#outbox::-webkit-scrollbar, #chips::-webkit-scrollbar { display: none; }
+#outbox > *, #chips > * { flex: none; }
+#chips > .answerBtn { flex: 1; }
+#outbox:empty, #chips:empty { display: none; }
+.chip { height: 44px; min-width: 44px; justify-content: center; padding: 0 13px; border-radius: 22px; border: 1px solid var(--line); background: var(--panel); font-size: 15px; font-weight: 650; letter-spacing: 0.02em; display: inline-flex; align-items: center; gap: 6px; transition: background-color 0.15s, color 0.15s; }
+.chip.on { background: var(--gold); color: #241a00; border-color: var(--gold); }
+.chip.violet { border-color: rgba(185,147,255,0.6); color: #e2d4ff; }
+.chip.violet.on { background: var(--violet); color: #1b0f33; }
+.chip.blue { border-color: rgba(168,210,255,0.6); color: var(--blue); }
+.chip.hint { border: 0; background: none; color: var(--dim); font-weight: 500; padding: 0 4px; letter-spacing: 0; }
+.chip.out { background: rgba(243,214,140,0.08); border-color: rgba(243,214,140,0.45); color: var(--gold); padding-right: 2px; animation: rise 0.25s ease; }
+.chip.out.old, .answerBtn.old { animation: none; }
+#chips.compact .chip { padding: 0 10px; font-size: 14px; letter-spacing: 0.01em; }
+.chip.out .who { color: var(--home); }
+.chip.out .eta { color: rgba(243,214,140,0.75); font-weight: 500; }
+.chip.out .x { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: 20px; color: var(--dim); font-size: 15px; }
+.chip.out .x:active { background: rgba(255,255,255,0.08); }
+.chip:active { filter: brightness(1.25); }
+#primaryRow { display: flex; gap: 8px; }
+.primary { position: relative; flex: 1; height: 54px; border-radius: 16px; background: var(--home); color: #1b1408; font-weight: 800; font-size: 17px; letter-spacing: 0.1em; box-shadow: 0 0 0 1px rgba(255,243,214,0.4), 0 6px 22px rgba(255,236,200,0.12); transition: background-color 0.25s ease, box-shadow 0.25s ease, transform 0.08s ease; }
+.primary.tx { background: var(--gold); box-shadow: 0 0 0 1px rgba(243,214,140,0.6), 0 6px 26px rgba(243,214,140,0.25); }
+.primary.pend { background: #dbe8ff; box-shadow: 0 0 0 1px rgba(219,232,255,0.5), 0 6px 22px rgba(168,210,255,0.08); }
+.primary.listen { background: var(--green); box-shadow: 0 0 0 1px rgba(201,242,221,0.5), 0 6px 22px rgba(170,240,200,0.08); }
+.primary.pulse { animation: pulse 1.3s ease-in-out infinite; }
+.primary.sent::after { content: ''; position: absolute; inset: 0; border-radius: inherit; animation: sent 0.5s ease-out forwards; pointer-events: none; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(255,243,214,0.5), 0 0 28px rgba(255,236,200,0.4); } }
+@keyframes sent { from { box-shadow: 0 0 0 0 rgba(255,243,214,0.75); } to { box-shadow: 0 0 0 14px rgba(255,243,214,0); } }
+.primary:active { transform: scale(0.985); }
+.primary:disabled { opacity: 0.55; }
+.secondary { width: 64px; height: 54px; border-radius: 16px; background: var(--panel2); border: 1px solid var(--line); font-size: 14px; letter-spacing: -0.12em; color: var(--home); transition: background-color 0.2s, border-color 0.2s; }
+.secondary.on { border-color: var(--gold); color: var(--gold); background: rgba(243,214,140,0.1); }
+.secondary:disabled { opacity: 0.3; }
+.answerBtn { height: 44px; border-radius: 14px; border: 1px solid rgba(168,210,255,0.6); color: var(--blue); background: rgba(168,210,255,0.08); font-weight: 700; letter-spacing: 0.06em; width: 100%; animation: rise 0.4s ease; }
+
+/* bottom sheet */
+#sheetBack { position: fixed; inset: 0; background: rgba(2,5,12,0.55); z-index: 10; animation: fade 0.2s ease; }
+#sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 11; max-width: 560px; margin: 0 auto; max-height: 74%; display: flex; flex-direction: column; background: var(--panel); border-top: 1px solid var(--line); border-radius: 20px 20px 0 0; padding: 6px 16px calc(16px + var(--sab)); animation: up 0.28s cubic-bezier(.2,.8,.2,1); box-shadow: 0 -10px 40px rgba(0,0,0,0.5); }
+@keyframes up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+#sheetGrip { width: 40px; height: 4px; border-radius: 2px; background: rgba(160,185,230,0.25); margin: 4px auto 8px; flex: none; }
+#sheetX { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border-radius: 22px; color: var(--dim); font-size: 16px; z-index: 1; }
+#sheetX:active { background: var(--panel2); }
+#sheetBody { overflow-y: auto; -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text; padding-bottom: 2px; }
+#sheetBody h2 { font-size: 19px; margin: 2px 48px 8px 0; font-weight: 700; color: var(--home); }
+#sheetBody h2 .k { font-size: 11.5px; font-weight: 650; letter-spacing: 0.14em; color: var(--dim); display: block; margin-bottom: 3px; text-transform: uppercase; }
+#sheetBody p { margin: 7px 0; color: var(--body); }
+#sheetBody .age { color: var(--home); }
+#sheetBody .rule { border-left: 2px solid var(--violet); padding-left: 10px; color: #e2d4ff; }
+#sheetBody .tagline { color: var(--gold); }
+#sheetBody hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0 12px; }
+.menu { display: flex; flex-direction: column; gap: 6px; }
+.menu .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.menu .grid button { flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; min-height: 54px; padding: 4px 14px; line-height: 1.25; }
+.menu .grid button .v { font-size: 13px; }
+.menu button { min-height: 48px; text-align: left; padding: 0 14px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); font-size: 15px; display: flex; align-items: center; justify-content: space-between; }
+.menu button .v { color: var(--dim); font-size: 14px; }
+.menu button .v.on { color: var(--teal); }
+.btnrow { display: flex; gap: 8px; margin-top: 14px; }
+.btnrow button { flex: 1; min-height: 50px; border-radius: 14px; font-weight: 700; background: var(--panel2); border: 1px solid var(--line); }
+.btnrow button.go { background: var(--home); color: #1b1408; border-color: transparent; }
+.loglist { font-size: 15px; }
+.loglist div { padding: 8px 0; border-bottom: 1px solid rgba(160,185,230,0.07); color: var(--body); display: flex; gap: 10px; }
+.loglist .y { flex: none; color: var(--dim); font-variant-numeric: tabular-nums; font-size: 12px; min-width: 3.4em; padding-top: 2px; letter-spacing: 0.06em; }
+.codex div { padding: 10px 0; border-bottom: 1px solid rgba(160,185,230,0.07); color: var(--body); }
+.codex b { display: block; color: var(--home); font-size: 15px; margin-bottom: 2px; }
+.codex .locked { color: var(--dim); letter-spacing: 0.1em; }
+.lv { display: flex; flex-direction: column; gap: 6px; }
+.lv button { min-height: 50px; text-align: left; padding: 0 14px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+.lv button.cur { border-color: rgba(255,243,214,0.45); }
+.lv .act { font-size: 11px; letter-spacing: 0.16em; color: var(--dim); margin: 10px 0 0 4px; text-transform: uppercase; }
+.lv .act:first-child { margin-top: 0; }
+.lv .num { color: var(--dim); width: 1.4em; font-variant-numeric: tabular-nums; }
+.lv .done { margin-left: auto; color: var(--teal); }
+.hints p { padding: 10px 12px; background: var(--panel2); border-radius: 10px; }
+.hints p:last-child { animation: fadein 0.3s ease; }
+
+/* overlay cards */
+#overlay { position: fixed; inset: 0; z-index: 20; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: calc(24px + var(--sat)) 24px calc(24px + var(--sab)); text-align: center; animation: fade 0.45s ease; }
+#overlay.tapcard { cursor: pointer; }
+.card { position: relative; max-width: 420px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.card .line { font-size: 21px; line-height: 1.38; color: var(--home); animation: fadein 0.8s ease both; font-weight: 400; text-wrap: balance; }
+.card .prev, .card.still .ttl2, .card.still .kicker { animation: none; }
+.card .sub { font-size: 17px; line-height: 1.45; color: var(--body); animation: fadein 0.8s ease both; text-wrap: balance; }
+.card .kicker { font-size: 12px; letter-spacing: 0.24em; color: var(--dim); text-transform: uppercase; margin-right: -0.24em; }
+.card .title { font-size: clamp(28px, 9.6vw, 42px); letter-spacing: 0.26em; margin-right: -0.26em; white-space: nowrap; font-weight: 300; color: var(--home); text-shadow: 0 0 30px rgba(255,236,200,0.35); }
+.card .ttl2 { font-size: 27px; font-weight: 650; color: var(--home); line-height: 1.2; text-wrap: balance; animation: fadein 0.6s ease both; }
+.card .rule { width: 36px; height: 1px; background: rgba(255,243,214,0.35); }
+.card.inter .itext { min-height: 150px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.tapmore { position: absolute; bottom: calc(22px + var(--sab)); left: 0; right: 0; font-size: 11px; letter-spacing: 0.24em; color: var(--dim); text-transform: uppercase; animation: breathe 2.6s ease-in-out infinite; pointer-events: none; }
+@keyframes breathe { 50% { opacity: 0.35; } }
+.halo { position: absolute; left: 50%; top: 50%; width: 260px; height: 260px; margin: -130px 0 0 -130px; border-radius: 50%; border: 1px solid rgba(255,243,214,0.35); opacity: 0; pointer-events: none; animation: ripple 5s cubic-bezier(.1,.6,.3,1) infinite; }
+.halo.b { animation-delay: 2.5s; }
+@keyframes ripple { 0% { transform: scale(0.1); opacity: 0.8; } 100% { transform: scale(1.9); opacity: 0; } }
+.titlewrap { position: relative; padding: 30px 0 4px; }
+.bigbtn { min-height: 54px; min-width: 200px; padding: 0 28px; border-radius: 16px; background: var(--home); color: #1b1408; font-weight: 800; letter-spacing: 0.1em; font-size: 16px; box-shadow: 0 6px 26px rgba(255,236,200,0.15); }
+.bigbtn:active { transform: scale(0.985); }
+.ghostbtn { min-height: 48px; min-width: 200px; padding: 0 18px; border-radius: 14px; border: 1px solid var(--line); color: var(--text); }
+.caption { font-size: 14px; color: var(--dim); font-style: italic; line-height: 1.45; }
+.found { font-size: 12px; letter-spacing: 0.16em; color: var(--teal); text-transform: uppercase; }
+
+/* win + truth replay */
+.win { max-width: 440px; width: 100%; display: flex; flex-direction: column; gap: 8px; align-items: stretch; max-height: 100%; overflow-y: auto; scrollbar-width: none; }
+.win > * { flex: none; }
+.win .kicker { font-size: 11.5px; letter-spacing: 0.22em; color: var(--dim); text-transform: uppercase; }
+.win .conf { font-size: 26px; font-weight: 650; color: var(--home); letter-spacing: 0.02em; line-height: 1.15; animation: fadein 0.5s ease both; }
+.win .conf::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--home); box-shadow: 0 0 12px rgba(255,243,214,0.8); margin-right: 10px; vertical-align: 0.18em; }
+.win .conf.plain { font-size: 22px; }
+.win .conf.plain::before { display: none; }
+.win .when { font-size: 17px; color: var(--body); line-height: 1.4; animation: fadein 0.5s ease 0.15s both; }
+.win .when b { color: var(--gold); font-weight: 700; font-variant-numeric: tabular-nums; }
+.win .end { font-size: 15px; color: var(--dim); font-style: italic; line-height: 1.4; text-wrap: balance; animation: fadein 0.5s ease 0.3s both; }
+.replay { width: 100%; display: flex; flex-direction: column; gap: 6px; align-items: center; margin-top: 4px; animation: fade 0.6s ease 0.35s both; }
+.rbox { position: relative; }
+.rbox canvas { display: block; border-radius: 14px; background: #050a17; border: 1px solid var(--line); }
+.rtag { position: absolute; left: 10px; top: 8px; right: 10px; display: flex; justify-content: space-between; font-size: 11px; letter-spacing: 0.14em; color: var(--dim); text-transform: uppercase; pointer-events: none; font-variant-numeric: tabular-nums; }
+.rtag .rmode { color: var(--home); opacity: 0.8; }
+.rctl { display: flex; align-items: center; gap: 8px; width: 100%; }
+.seg { flex: 1; display: flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.seg button { flex: 1; min-height: 44px; padding: 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--dim); transition: background-color 0.2s, color 0.2s; }
+.seg button.on { background: var(--panel2); color: var(--home); }
+.rbtn { width: 44px; height: 44px; flex: none; border-radius: 12px; border: 1px solid var(--line); color: var(--home); font-size: 18px; }
+.scrub { width: 100%; }
+.scrub input { width: 100%; height: 36px; margin: 0; background: none; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.scrub input::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: rgba(160,185,230,0.25); }
+.scrub input::-moz-range-track { height: 3px; border-radius: 2px; background: rgba(160,185,230,0.25); }
+.scrub input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -8.5px; border-radius: 50%; background: var(--home); box-shadow: 0 0 10px rgba(255,243,214,0.5); }
+.scrub input::-moz-range-thumb { width: 20px; height: 20px; border: 0; border-radius: 50%; background: var(--home); }
+.rlabel { font-size: 13px; color: var(--dim); min-height: 1.3em; }
+
+/* endings */
+.stampwrap { position: relative; padding: 22px 22px 20px; border: 1px solid var(--line); border-radius: 6px; background: #0b1224; width: 100%; max-width: 360px; text-align: left; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+.stampwrap .doc { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13.5px; color: #b9c4d9; line-height: 1.65; }
+.stampwrap .doc.letter { font-family: inherit; font-size: 16px; line-height: 1.55; color: var(--body); }
+.stampwrap .doc.letter .sig { display: block; margin-top: 12px; color: var(--home); }
+.stamp { display: inline-block; margin: 12px 0 0 4px; transform: rotate(-8deg); border: 3px solid currentColor; color: #ff9d8a; padding: 6px 10px; font-family: system-ui, sans-serif; font-weight: 900; letter-spacing: 0.1em; font-size: clamp(13px, 4.2vw, 16px); white-space: nowrap; line-height: 1.15; border-radius: 6px; animation: stamp 0.42s cubic-bezier(.3,1.5,.5,1) 0.6s both; background: rgba(11,18,36,0.6); }
+.stamp.blue { color: #9fd0ff; } .stamp.gold { color: var(--gold); }
+@keyframes stamp { from { transform: rotate(-8deg) scale(2.2); opacity: 0; } to { transform: rotate(-8deg) scale(1); opacity: 1; } }
+.wave { display: block; width: 100%; max-width: 360px; height: 80px; }
+#fAfter { display: flex; flex-direction: column; gap: 12px; }
+.credits { gap: 10px; }
+.credits .title { margin-bottom: 14px; }
+.credits .line { font-size: 17px; color: var(--body); }
+.credits .line:nth-of-type(2) { animation-delay: 0.3s; } .credits .line:nth-of-type(3) { animation-delay: 0.6s; }
+.credits .line:nth-of-type(4) { animation-delay: 0.9s; } .credits .line:nth-of-type(5) { animation-delay: 1.2s; }
+.credits .line:nth-of-type(6) { animation-delay: 1.8s; color: var(--home); }
+.credits .tail { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 18px; animation: fadein 0.8s ease 2.2s both; }
+
+@media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition: none !important; } .halo { display: none; } }
+body.reduced * { animation-duration: 0.01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition: none !important; }
+body.reduced .halo { display: none; }
+@media (max-height: 620px) { .primary, .secondary { height: 48px; } #top { height: 44px; } }
+
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <button id="lvlname" class="ghost" aria-label="Level"></button>
+    <div id="year" aria-live="polite"><span class="k">YEAR</span><b>0</b></div>
+    <button id="menuBtn" class="iconbtn" aria-label="Menu"><span class="burger"></span></button>
+    <div id="tickbar"></div>
+  </header>
+  <button id="obj" class="ghost"><span id="objtext"></span><span class="i" aria-hidden="true">i</span></button>
+  <div id="boardwrap">
+    <canvas id="board" aria-label="Board"></canvas>
+    <div id="float"><div id="toast" class="hidden"></div><div id="coach" class="hidden"></div></div>
+  </div>
+  <div id="dock">
+    <button id="log" class="ghost"><span class="sym" aria-hidden="true"></span><span id="logtext"></span><span id="logact"></span></button>
+    <div id="outbox"></div>
+    <div id="chips"></div>
+    <div id="primaryRow">
+      <button id="primary" class="primary">WAIT &#9656;</button>
+      <button id="ff" class="secondary" aria-label="Until news">&#9656;&#9656;</button>
+    </div>
+  </div>
+</div>
+<div id="sheetBack" class="hidden"></div>
+<div id="sheet" class="hidden" role="dialog"><div id="sheetGrip"></div><button id="sheetX" aria-label="Close">&#10005;</button><div id="sheetBody"></div></div>
+<div id="overlay" class="hidden"></div>
+<script>
+"use strict";
+const LEVELS_JSON = [{"n":1,"act":1,"name":"As It Was","R":4,"drones":{"A":[-1,1]},"derelicts":[{"id":"D1","pos":[2,-3],"dir":"SE","period":3,"first":2},{"id":"D2","pos":[-4,5],"dir":"NE","period":3,"first":8}],"objective":{"type":"tag_any","text":"Tag a derelict."},"test_plans":{"naive: aim at what you see":[[0,"MOVE","A",[2,-4]]],"naive, then corrected at y2":[[0,"MOVE","A",[2,-4]],[2,"MOVE","A",[2,-1]]],"reference: wait for projection":[[2,"MOVE","A",[2,0]]],"second chance only (D2)":[[0,"MOVE","A",[2,-4]],[12,"MOVE","A",[2,-1]]]}},{"n":2,"act":1,"name":"Closer Than It Looks","R":4,"drones":{"A":[-1,0],"B":[-2,4]},"derelicts":[{"id":"D1","pos":[1,-4],"dir":"SE","period":3,"first":3},{"id":"D2","pos":[1,0],"dir":"SW","period":3,"first":3}],"watchers":[{"id":"m0","pos":[-3,-1],"kind":"mirror","hidden":true}],"objective":{"type":"tag","ids":["D1","D2"],"text":"Tag both derelicts."},"test_plans":{"naive: aim at what you see (y5)":[[5,"MOVE","A",[1,-3]],[5,"MOVE","B",[-1,2]]],"reference":[[6,"MOVE","B",[-3,4]],[7,"MOVE","A",[1,0]]]}},{"n":3,"act":1,"name":"Chorus","R":4,"drones":{"A":[-1,0],"B":[2,2]},"receivers":[{"id":"X","cell":[3,-1],"need":2}],"watchers":[{"id":"m1","pos":[-2,-1],"kind":"mirror","hidden":true}],"objective":{"type":"rec","id":"X","text":"Wake the old relay: two signals must reach it in the same year."},"test_plans":{"naive: flash both now":[[0,"FLASH","A",null],[0,"FLASH","B",null]],"reference":[[0,"FLASH","B",null],[2,"FLASH","A",null]]}},{"n":4,"act":1,"name":"Filed Noise","R":4,"drones":{"A":[0,-2],"B":[-2,3],"C":[3,1]},"derelicts":[{"id":"D","pos":[-3,-1],"dir":"E","period":3,"first":2}],"receivers":[{"id":"X","ride":"D","need":3}],"watchers":[{"id":"m2","pos":[-3,0],"kind":"mirror","hidden":true},{"id":"m3","pos":[2,2],"kind":"mirror","hidden":true}],"objective":{"type":"rec","id":"X","text":"A relay rides this derelict. Three signals, one year."},"test_plans":{"naive: flash all at y5":[[5,"FLASH","A",null],[5,"FLASH","B",null],[5,"FLASH","C",null]],"reference (sends after projection)":[[5,"FLASH","C",null],[6,"FLASH","B",null],[9,"FLASH","A",null]]}},{"n":5,"act":2,"name":"Standing","R":4,"drones":{},"watchers":[{"id":"P","pos":[3,-3],"kind":"precedent"},{"id":"S","pos":[-3,1],"kind":"sign"}],"objective":{"type":"sign","text":"Ask both watchers. Collect both signatures."},"test_plans":{"naive: ask both at once":[[0,"PING","HOME","P"],[0,"PING","HOME","S"]],"wrong order":[[0,"PING","HOME","S"],[1,"PING","HOME","P"]],"reference":[[0,"PING","HOME","P"],[1,"PING","HOME","S"]]}},{"n":6,"act":2,"name":"No Universal Now","R":4,"drones":{"X":[4,-4],"Y":[0,-1]},"watchers":[{"id":"P","pos":[3,-3],"kind":"precedent"},{"id":"Q","pos":[0,-3],"kind":"precedent"}],"objective":{"type":"sign","text":"Each insists on being asked first. Satisfy both."},"test_plans":{"naive: both drones now":[[0,"FLASH","X","P"],[0,"FLASH","Y","Q"]],"Home asks both, P first":[[0,"PING","HOME","P"],[1,"PING","HOME","Q"]],"Home asks both, Q first":[[0,"PING","HOME","Q"],[1,"PING","HOME","P"]],"one drone does both":[[0,"FLASH","X","P"],[0,"MOVE","X",[1,-3]],[9,"FLASH","X","Q"]],"reference":[[0,"FLASH","X","P"],[2,"FLASH","Y","Q"]],"alt: drone + Home":[[0,"FLASH","X","P"],[3,"PING","HOME","Q"]]}},{"n":7,"act":2,"name":"The Knot","R":4,"drones":{"X":[2,-4],"Y":[0,-1],"Z":[4,-1]},"watchers":[{"id":"P","pos":[2,-3],"kind":"precedent"},{"id":"Q","pos":[0,-2],"kind":"precedent"},{"id":"R","pos":[3,-1],"kind":"precedent","split":{"tick":6,"id":"R2","pos":[3,0],"kind":"sign"}}],"objective":{"type":"sign","text":"Three precedents. Every party must sign."},"test_plans":{"naive: all three now":[[0,"FLASH","X","P"],[0,"FLASH","Y","Q"],[0,"FLASH","Z","R"]],"solve P,Q,R but miss the split":[[0,"FLASH","X","P"],[3,"FLASH","Y","Q"],[0,"FLASH","Z","R"]],"reference":[[0,"FLASH","X","P"],[3,"FLASH","Y","Q"],[0,"FLASH","Z","R"],[9,"PING","HOME","R2"]]}}];
+// LIGHT LAG — rules simulator. Faithful port of reference/sim.py, plus two
+// finale-only extensions (STANDING orders and the independent drone's own
+// answer). Pure functions; no DOM. Shared by the game and the node tests.
+const SIM = (() => {
+  const DIRS = { E: [1, 0], NE: [1, -1], NW: [0, -1], W: [-1, 0], SW: [-1, 1], SE: [0, 1] };
+  const HOME = [0, 0];
+  const DRONE_STEP = 2;
+
+  const eq = (a, b) => !!a && !!b && a[0] === b[0] && a[1] === b[1];
+  function dist(a, b) {
+    const dq = a[0] - b[0], dr = a[1] - b[1];
+    return Math.max(Math.abs(dq), Math.abs(dr), Math.abs(dq + dr));
+  }
+  const ring = (p) => dist(p, HOME);
+  // Python's round(): half to even
+  function pyRound(x) {
+    const f = Math.floor(x), d = x - f;
+    if (d > 0.5) return f + 1;
+    if (d < 0.5) return f;
+    return f % 2 === 0 ? f : f + 1;
+  }
+  function cubeRound(x, y, z) {
+    let rx = pyRound(x), ry = pyRound(y), rz = pyRound(z);
+    const dx = Math.abs(rx - x), dy = Math.abs(ry - y), dz = Math.abs(rz - z);
+    if (dx > dy && dx > dz) rx = -ry - rz;
+    else if (dy > dz) ry = -rx - rz;
+    else rz = -rx - ry;
+    return [rx + 0, rz + 0];
+  }
+  function stepToward(a, b) {
+    const n = dist(a, b);
+    if (n === 0) return a;
+    const ax = a[0] + 1e-6, az = a[1] + 2e-6, ay = -ax - az;
+    const bx = b[0] + 1e-6, bz = b[1] + 2e-6, by = -bx - bz;
+    const t = 1.0 / n;
+    return cubeRound(ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t);
+  }
+  function path(a, b) {
+    const out = [a];
+    while (!eq(out[out.length - 1], b)) out.push(stepToward(out[out.length - 1], b));
+    return out;
+  }
+
+  // plan: array of {t, kind, who, arg} or [t, kind, who, arg]
+  //   MOVE who=drone arg=[q,r] · FLASH who=drone arg=null|watcherId
+  //   PING who='HOME' arg=watcherId · STANDING who=drone (finale)
+  function simulate(level, planIn, T = 80) {
+    const R = level.R;
+    const plan = (planIn || []).map((x) => Array.isArray(x) ? { t: x[0], kind: x[1], who: x[2], arg: x[3] } : x);
+    const drones = Object.entries(level.drones || {}).map(([k, v]) => ({ id: k, pos: [v[0], v[1]], target: null, next: null, indep: null, arrivedAt: null }));
+    const D = Object.fromEntries(drones.map((d) => [d.id, d]));
+    const ders = (level.derelicts || []).map((d) => ({ id: d.id, pos: [d.pos[0], d.pos[1]], dir: DIRS[d.dir], p: d.period, next: d.first, gone: false, tagged: null, entered: ring(d.pos) <= R }));
+    const recs = (level.receivers || []).map((r) => Object.assign({}, r, { active: null }));
+    const wat = (level.watchers || []).map((w) => ({ id: w.id, pos: [w.pos[0], w.pos[1]], kind: w.kind, signed: null, offended: null, born: 0, split: w.split || null, hidden: !!w.hidden }));
+    const W = Object.fromEntries(wat.map((w) => [w.id, w]));
+    const pulses = [], events = [], arrivals = [], received = new Set(), hist = {};
+    const planned = {};
+    for (const o of plan) (planned[o.t] = planned[o.t] || []).push(o);
+
+    const derById = Object.fromEntries(ders.map((d) => [d.id, d]));
+    const recPos = (r) => {
+      if (r.cell) return r.cell;
+      const d = derById[r.ride];
+      return d.gone ? null : d.pos;
+    };
+    const H = (key) => (hist[key] = hist[key] || {});
+    function record(t) {
+      for (const d of drones) H('drone:' + d.id)[t] = d.pos;
+      for (const d of ders) if (!d.gone && ring(d.pos) <= R) H('der:' + d.id)[t] = d.pos;
+      for (const w of wat) if (w.born <= t) H('wat:' + w.id)[t] = w.pos;
+    }
+    function emitHome(t) {
+      for (const o of planned[t] || []) {
+        if (o.kind === 'MOVE' || o.kind === 'FLASH' || o.kind === 'STANDING') {
+          pulses.push({ src: HOME, t, kind: 'order', to: o.who, payload: [o.kind, o.arg], sent: t, from: 'HOME' });
+        } else if (o.kind === 'PING') {
+          pulses.push({ src: HOME, t, kind: 'signal', to: o.arg, payload: 'HOME', sent: t, from: 'HOME' });
+          events.push({ t, pos: HOME, type: 'flash', data: ['HOME', o.arg], sent: t });
+        }
+      }
+    }
+    function arrivalsAt(t) {
+      const sigAtRec = {}, watIn = {};
+      let changed = true;
+      while (changed) {
+        changed = false;
+        const targets = [];
+        for (const d of drones) targets.push(['drone', d.id, d.pos]);
+        for (const w of wat) if (w.born <= t) targets.push(['wat', w.id, w.pos]);
+        for (const r of recs) { const p = recPos(r); if (p) targets.push(['rec', r.id, p]); }
+        const snap = pulses.slice();
+        for (let i = 0; i < snap.length; i++) {
+          const p = snap[i];
+          if (p.t > t) continue;
+          for (const [typ, k, pos] of targets) {
+            const key = i + '|' + typ + '|' + k;
+            if (received.has(key)) continue;
+            if (t - p.t >= dist(p.src, pos)) {
+              received.add(key);
+              if (typ === 'wat' && p.t + dist(p.src, pos) < W[k].born) continue;
+              changed = true;
+              arrivals.push({ i, typ, k, t });
+              if (typ === 'drone' && p.kind === 'order' && p.to === k) {
+                const [kind, arg] = p.payload; const d = D[k];
+                if (d.indep !== null) { events.push({ t, pos: d.pos, type: 'declined', data: [k, kind], sent: p.sent }); continue; }
+                events.push({ t, pos: d.pos, type: 'order_rx', data: [k, kind], sent: p.sent });
+                if (kind === 'FLASH') {
+                  pulses.push({ src: d.pos, t, kind: 'signal', to: arg, payload: k, sent: p.sent, from: k });
+                  events.push({ t, pos: d.pos, type: 'flash', data: [k, arg], sent: p.sent });
+                } else if (kind === 'STANDING') {
+                  d.indep = t; d.target = level.standing.target; d.next = t + DRONE_STEP;
+                  events.push({ t, pos: d.pos, type: 'standing', data: [k], sent: p.sent });
+                  if (eq(d.pos, d.target)) { d.target = null; d.arrivedAt = t; }
+                } else {
+                  d.target = arg; d.next = t + DRONE_STEP;
+                }
+              } else if (typ === 'rec' && p.kind === 'signal' && p.to === null) {
+                (sigAtRec[k] = sigAtRec[k] || []).push(i);
+              } else if (typ === 'wat') {
+                (watIn[k] = watIn[k] || []).push(p);
+              }
+            }
+          }
+        }
+      }
+      for (const r of recs) {
+        const lst = sigAtRec[r.id];
+        if (lst && r.active === null && lst.length >= r.need) { r.active = t; events.push({ t, pos: recPos(r), type: 'rec_on', data: r.id }); }
+      }
+      for (const w of wat) {
+        const plist = watIn[w.id];
+        if (!plist) continue;
+        events.push({ t, pos: w.pos, type: 'glint', data: w.id });
+        if ((w.kind !== 'sign' && w.kind !== 'precedent') || w.signed !== null || w.offended !== null) continue;
+        const mine = plist.filter((p) => p.kind === 'signal' && p.to === w.id);
+        const others = plist.filter((p) => p.kind === 'signal' && p.to !== null && p.to !== w.id);
+        if (w.kind === 'precedent' && others.length) {
+          w.offended = t;
+          events.push({ t, pos: w.pos, type: 'offended', data: w.id, cause: others.map((p) => p.sent), tie: mine.length > 0 });
+        } else if (mine.length) {
+          w.signed = t; events.push({ t, pos: w.pos, type: 'sign', data: w.id });
+        }
+      }
+    }
+
+    // Prehistory
+    for (let tau = -3 * R; tau < 0; tau++) {
+      for (const d of drones) H('drone:' + d.id)[tau] = d.pos;
+      for (const w of wat) H('wat:' + w.id)[tau] = w.pos;
+      for (const d of ders) {
+        let steps = 0;
+        for (let s = d.next - d.p; s > tau; s -= d.p) if (s <= 0) steps++;
+        const pos = [d.pos[0] - d.dir[0] * steps, d.pos[1] - d.dir[1] * steps];
+        if (ring(pos) <= R) H('der:' + d.id)[tau] = pos;
+      }
+    }
+    record(0); emitHome(0); arrivalsAt(0);
+    for (let t = 1; t <= T; t++) {
+      const prev = Object.fromEntries(drones.map((d) => [d.id, d.pos]));
+      const prevd = Object.fromEntries(ders.map((d) => [d.id, d.pos]));
+      for (const d of ders) {
+        if (!d.gone && d.next === t) {
+          d.pos = [d.pos[0] + d.dir[0], d.pos[1] + d.dir[1]]; d.next += d.p;
+          if (ring(d.pos) <= R) d.entered = true;
+          else if (d.entered) { d.gone = true; events.push({ t, pos: prevd[d.id], type: 'exit', data: d.id }); }
+        }
+      }
+      for (const d of drones) {
+        if (d.target !== null && d.next === t) {
+          d.pos = stepToward(d.pos, d.target); d.next += DRONE_STEP;
+          if (eq(d.pos, d.target)) { d.target = null; if (d.indep !== null) d.arrivedAt = t; }
+        }
+      }
+      for (const w of wat.slice()) {
+        const s = w.split;
+        if (s && s.tick === t) {
+          const c = { id: s.id, pos: s.pos, kind: s.kind, signed: null, offended: null, born: t, split: null, hidden: false, parent: w.id };
+          wat.push(c); W[c.id] = c;
+          events.push({ t, pos: s.pos, type: 'split', data: [w.id, s.id] });
+        }
+      }
+      // finale: an independent drone answers after listening
+      for (const d of drones) {
+        if (d.indep !== null && d.arrivedAt !== null && level.standing && t === d.arrivedAt + level.standing.listen) {
+          pulses.push({ src: d.pos, t, kind: 'signal', to: level.standing.to, payload: d.id, sent: null, from: d.id, standing: true });
+          events.push({ t, pos: d.pos, type: 'flash', data: [d.id, level.standing.to], standing: true });
+        }
+      }
+      emitHome(t); arrivalsAt(t);
+      for (const d of ders) {
+        if (d.gone || d.tagged !== null) continue;
+        for (const dr of drones) {
+          if (eq(dr.pos, d.pos) || (eq(dr.pos, prevd[d.id]) && eq(prev[dr.id], d.pos))) {
+            d.tagged = t; events.push({ t, pos: d.pos, type: 'tag', data: [d.id, dr.id] }); break;
+          }
+        }
+      }
+      record(t);
+    }
+    return { events, arrivals, pulses, hist, drones, ders, recs, wat };
+  }
+
+  const seenTick = (ev) => ev.t + ring(ev.pos);
+
+  const sortedTicks = (h) => h.__ticks || Object.defineProperty(h, '__ticks', { value: Object.keys(h).map(Number).sort((a, b) => a - b) }).__ticks;
+  function seenPos(h, now) {
+    if (!h) return null;
+    let best = null;
+    for (const tau of sortedTicks(h)) if (tau + ring(h[tau]) <= now) best = tau;
+    return best === null ? null : [best, h[best]];
+  }
+
+  function outcome(level, plan, T = 80, res) {
+    res = res || simulate(level, plan, T);
+    const ev = res.events, obj = level.objective, req = [];
+    if (obj.type === 'tag_any') {
+      const e = ev.filter((x) => x.type === 'tag');
+      if (!e.length) return null;
+      req.push(e.reduce((a, b) => (seenTick(b) < seenTick(a) ? b : a)));
+    } else if (obj.type === 'tag') {
+      for (const id of obj.ids) {
+        const e = ev.find((x) => x.type === 'tag' && x.data[0] === id);
+        if (!e) return null; req.push(e);
+      }
+    } else if (obj.type === 'rec') {
+      const e = ev.find((x) => x.type === 'rec_on' && x.data === obj.id);
+      if (!e) return null; req.push(e);
+    } else if (obj.type === 'sign') {
+      for (const w of res.wat) {
+        if (w.kind === 'sign' || w.kind === 'precedent') {
+          const e = ev.find((x) => x.type === 'sign' && x.data === w.id);
+          if (!e) return null; req.push(e);
+        }
+      }
+    } else return null;
+    const last = req.reduce((a, b) => (seenTick(b) > seenTick(a) ? b : a));
+    return { confirmed_at_home: seenTick(last), happened_at: last.t, lag: seenTick(last) - last.t, req };
+  }
+
+  function firstSeenMove(level, derId, horizon = 60) {
+    const res = simulate(level, [], horizon);
+    const h = res.hist['der:' + derId] || {};
+    let first = null;
+    for (let n = 0; n < horizon; n++) {
+      const s = seenPos(h, n);
+      if (!s) continue;
+      if (first === null) first = s[1];
+      else if (!eq(s[1], first)) return n;
+    }
+    return null;
+  }
+
+  return { DIRS, HOME, DRONE_STEP, eq, dist, ring, stepToward, path, simulate, seenTick, seenPos, outcome, firstSeenMove };
+})();
+if (typeof module !== 'undefined') module.exports = SIM;
+
+// LIGHT LAG — finale (Act III) timeline. Pure: derived from the sim result of
+// the finale level + the committed plan. W reacts only to what reaches it.
+const FIN = (() => {
+  const S = (typeof SIM !== 'undefined') ? SIM : require('./sim.js');
+  const W = [5, -3], WR = 5;
+  const CALLS = [5, 7, 9, 11, 13, 15, 17, 19];
+  const NOTYET = [8, 11, 14, 17, 20, 23, 26];
+  const PROBE_LAUNCH = 22, HOLD_AT = 25, HOLD_END = 30;
+
+  function decisive(plan) {
+    return plan.filter((o) => (o.kind === 'PING' && o.arg === 'W') || (o.kind === 'FLASH' && o.arg === 'W') || o.kind === 'STANDING');
+  }
+  function analyse(level, plan, res) {
+    res = res || S.simulate(level, plan, 70);
+    // first answer to physically reach W
+    let first = null;
+    for (const p of res.pulses) {
+      if (p.kind !== 'signal' || p.to !== 'W') continue;
+      const arrive = p.t + S.dist(p.src, W);
+      if (!first || arrive < first.arrive) first = { arrive, p };
+    }
+    const A = first ? first.arrive : null;
+    const kind = !first ? null : first.p.standing ? 'delegate' : 'answer';
+    const calls = CALLS.filter((c) => A === null || c < A);
+    const probe = A === null || A > PROBE_LAUNCH;
+    let endSeen = null, replyEmit = null, forward = null;
+    if (A !== null) {
+      replyEmit = A + 1;
+      if (kind === 'answer') endSeen = replyEmit + WR;
+      else {
+        const vpos = res.hist['drone:' + first.p.from][replyEmit] || first.p.src;
+        const rx = replyEmit + S.dist(W, vpos);
+        forward = { t: rx, pos: vpos };
+        endSeen = rx + S.ring(vpos);
+      }
+    }
+    const dec = decisive(plan);
+    const sentYear = dec.length ? Math.min(...dec.map((o) => o.t)) : null;
+    // standing: when Home calculates the order reached V (V's dashed outline vanishes)
+    const st = res.events.find((e) => e.type === 'standing');
+    return { A, kind, calls, probe, replyEmit, endSeen, forward, sentYear, standingAt: st ? st.t : null, standingSeen: st ? S.seenTick(st) : null, first };
+  }
+  // where their probe truly is at year t (null before launch)
+  function probePos(t) {
+    if (t < PROBE_LAUNCH) return null;
+    const path = S.path(W, [0, 0]);
+    const k = Math.min(path.length - 1, Math.floor((t - PROBE_LAUNCH) / 2));
+    return path[k];
+  }
+  function probeSeen(now) {
+    let best = null;
+    for (let t = PROBE_LAUNCH; t <= now; t++) { const p = probePos(t); if (t + S.ring(p) <= now) best = [t, p]; }
+    return best;
+  }
+  return { W, WR, CALLS, NOTYET, PROBE_LAUNCH, HOLD_AT, HOLD_END, analyse, decisive, probePos, probeSeen };
+})();
+if (typeof module !== 'undefined') module.exports = FIN;
+
+// LIGHT LAG — script, text and level extras. Level geometry comes from
+// reference/levels.json (injected by build.js as LEVELS_JSON).
+const FINALE_LEVEL = {
+  n: 8, act: 3, name: 'The Last Required Signature', R: 5,
+  drones: { V: [2, -1] }, watchers: [],
+  world: { id: 'W', pos: [5, -3] },
+  standing: { target: [4, -2], listen: 3, to: 'W' },
+  objective: { type: 'finale', text: 'Petition 1: pending.' },
+};
+
+const SCRIPT = {
+  1: {
+    intro: null,
+    end: 'Confirmed. It happened two years ago. You found out just now. This will keep happening.',
+    hints: ['Wait for the dashed marker.', 'Aim at the dotted track, not the solid image.', 'Re-aim A at the hex just ahead of the dashed marker.'],
+    startLog: ['Drone A is one light-year out. A derelict probe is drifting past the top edge.'],
+  },
+  2: {
+    intro: ['Two drones. Two derelicts.', 'Light from the near one is fresh. Light from the far one is not.'],
+    end: 'Objects in the past are closer than they appear.',
+    glints: ['Faint glint, ring {ring}. Instrument noise. Filed.'],
+    hints: ['Use the near drone for the near derelict.', "The far drone's orders take 4 years. Aim far down D2's track.", 'Year 6: move B one hex to its left. Year 7: move A to the hex just right of Home.'],
+    startLog: ['Two derelicts. One is very close. One only looks far.'],
+  },
+  3: {
+    intro: ['New order: FLASH.', 'A drone flashes the moment your order reaches it. Not before.'],
+    end: 'Sent at different times, from different places, arriving together. That is all harmony is.',
+    glints: ['Noise again. Filed.'],
+    hints: ['Read the arrival tags on the relay.', 'Make the two numbers match by waiting before you send one.', 'Send B now. Send A in two years.'],
+    startLog: ['An old relay, ring 3. It wakes for two signals arriving in the same year. It is particular about the same year.'],
+  },
+  4: {
+    intro: ['The relay is riding a derelict.', 'It will not wait for you.'],
+    end: 'Three voices, one year, one moving target. Logged.',
+    glints: ['Filed.', 'Same direction as last time? Different. Filed anyway.', 'The noise is very punctual.'],
+    hints: ['Pick a year after the projection appears, and work backwards.', 'Send each drone when its tag shows the chosen year.', 'Years 5, 6 and 9: C, then B, then A.'],
+    startLog: ['A relay rides that derelict. Tags read "?" until Home has seen it move.'],
+    actCard: ['Act I: Home.', 'Everything you saw had already happened.', 'Everything you said arrived late.', 'You did fine.'],
+  },
+  5: {
+    intro: ['Watchers are drawn now. Some of them have rules.', 'Home can speak for itself: tap Home, then ASK, then tap a watcher.'],
+    end: 'Two signatures. Neither of them was in a hurry.',
+    hints: ['P must hear its own request first.', 'Ask P, then S a year later.'],
+    startLog: ['Two neighbours. P will sign only if the first request it hears is addressed to it. S will sign when asked.'],
+  },
+  6: {
+    intro: ['Two precedents. Each insists on being asked first.', "From Home that's impossible: anything you say, they both hear in the same order.", "You'll have to say it from two places."],
+    end: 'Each was asked first. Both are correct.',
+    codex: 'Each was asked first. Both are correct. It only worked because your two requests were outside each other\'s light cones. For events like that, not even the universe insists on an order.',
+    hints: ["One place can't do it.", 'Ask from near P and near Q, close together in time.', 'X asks P now. Y asks Q two years later.'],
+    startLog: ['P and Q. Both precedents. Drones X and Y each sit near one of them.'],
+  },
+  7: {
+    intro: ['Three precedents, close together.', 'Every party must sign.'],
+    end: "All parties signed. One of them didn't exist when you started asking. That happens more than you'd think.",
+    hints: ['The near drone waits for the far ones.', 'Watch R.', "X and Z now, Y at year 3, then ask R\u2032 from Home once you see it."],
+    startLog: ['P, Q and R. Precedents, all three. Your drones X, Y and Z are each beside one.'],
+    actCard: ['Act II: Neighbours.', 'They have rules.', 'The rules are older than the reasons for them.', 'You were patient.'],
+  },
+  8: {
+    intro: ['Act III', 'The Last Required Signature'],
+    hints: [],
+    startLog: [],
+  },
+};
+
+const TEXT = {
+  opening: ['Light is the fastest thing there is.', 'It is still slow.', 'Everything you can see has already happened.'],
+  scale: [
+    '1 hex = 1 light-year. 1 tick = 1 year.',
+    'Light crosses one hex per year. Your drones manage half that. Derelicts, old probes on ancient courses, manage a third.',
+    'Nothing is faster than light. So everything you see is old, and every order you send arrives late.',
+    'Solid shapes: what Home sees (old light). Dashed shapes: what Home has calculated.',
+    'Drone clocks run about 13% slow at half light speed. Home has decided not to bring it up.',
+  ],
+  interstitial: [
+    'Reviewing filed noise.',
+    'Every glint arrived exactly when an echo of your own voice would have.',
+    'Something was listening. Several somethings. They acknowledged every word you sent, politely and faintly, and never interrupted.',
+    'I need to reconsider several classifications.',
+  ],
+  finaleOpen: [
+    'Petition 1. Opened before this world had oxygen.',
+    'Requires: the consent of its inhabitants.',
+    'Their consent cannot be requested without contacting them. That is why it is pending.',
+  ],
+  credits: ['LIGHT LAG', 'Concept: Vivian', 'Design: Evelyn', 'Build: Oliver', 'Polish: Claude Code', 'For Kane'],
+  forestCaption: 'wind through leaves \u00b7 someone breathing behind the microphone \u00b7 a bird nobody can name',
+};
+
+const CODEX = {
+  dilation: { t: 'Time dilation', b: 'Drone clocks run about 13% slow at 0.5c. Home has decided not to bring it up.' },
+  hurry: { t: 'Apparent speed', b: 'Approaching things appear to hurry. Receding things appear to linger. Neither is true. Both are late.' },
+  fastdrone: { t: 'Faster than light (not)', b: "Your drone appears to be travelling at the speed of light. It isn't. You're seeing its departure late and its arrival on time." },
+  departure: { t: 'Departure', b: 'A drone cannot outrun the news of its own departure.' },
+  lightcone: { t: 'No universal now', b: SCRIPT[6].codex },
+  noise: { t: 'Instrument noise', b: 'Every glint arrived exactly when an echo of your own voice would have. It was never noise.' },
+  split: { t: 'Division', b: 'Requests addressed to a parent do not count for its child. Nobody asks the new ones anything unless someone thinks to.' },
+  stale: { t: 'Stale consent', b: 'Their consent was five years old when you heard it. Your answer will be five years old when it arrives. Nobody involved is wrong.' },
+};
+
+const ENDINGS = {
+  answer: { name: 'The Long Hello', stamp: 'SUPERSEDED BY EVENTS' },
+  delegate: { name: 'Standing', stamp: 'TRANSFERRED' },
+  hold: { name: 'Pending', stamp: 'PENDING' },
+};
+
+// LIGHT LAG — WebAudio synth. Everything here has a visual twin; failure is silent.
+const AU = (() => {
+  let ctx = null, master = null, on = true, wind = null, unlocked = false;
+  function init() {
+    // no AudioContext until the player has tapped something
+    if (ctx || !on || !unlocked) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ctx = new AC();
+      master = ctx.createGain(); master.gain.value = 0.7; master.connect(ctx.destination);
+    } catch (e) { ctx = null; }
+  }
+  function resume() { try { if (ctx && ctx.state === 'suspended') ctx.resume(); } catch (e) {} }
+  const ok = () => on && ctx && ctx.state !== 'closed';
+  function tone(freq, dur, type, gain, when = 0, slideTo = null) {
+    if (!ok()) return;
+    const t0 = ctx.currentTime + when;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + Math.min(0.03, dur / 4));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  let noiseBuf = null;
+  function noise() {
+    if (noiseBuf) return noiseBuf;
+    const len = ctx.sampleRate * 2; noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0); let b = 0;
+    for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; b = (b + 0.02 * w) / 1.02; d[i] = b * 3.5 + w * 0.15; }
+    return noiseBuf;
+  }
+  const api = {
+    get on() { return on; },
+    set on(v) { on = v; if (!v) api.stopWind(); if (v) init(); },
+    // called from tap handlers only
+    init() { unlocked = true; init(); resume(); },
+    thoom() { tone(70, 0.6, 'sine', 0.5, 0, 45); tone(140, 0.25, 'triangle', 0.08); tone(880, 0.35, 'sine', 0.015, 0.02, 660); },
+    tick() { tone(1500, 0.045, 'triangle', 0.05); },
+    chime() { tone(2600 + Math.random() * 400, 0.5, 'sine', 0.035); },
+    step() { tone(420, 0.08, 'sine', 0.05); },
+    tag() { tone(784, 0.25, 'triangle', 0.06); tone(1175, 0.4, 'sine', 0.045, 0.07); },
+    wake() { tone(523, 0.9, 'sine', 0.07); tone(659, 0.9, 'sine', 0.05, 0.05); tone(1046, 0.7, 'sine', 0.025, 0.1); },
+    chord() { tone(392, 1.6, 'sine', 0.14); tone(587, 1.8, 'sine', 0.1, 0.14); tone(784, 1.6, 'sine', 0.04, 0.28); },
+    sign() { tone(660, 0.4, 'triangle', 0.08); tone(990, 0.5, 'sine', 0.05, 0.08); },
+    object() { tone(180, 0.5, 'sawtooth', 0.05, 0, 120); },
+    call() { if (!ok()) return; [2, 3, 5, 7].reduce((w, n) => { for (let i = 0; i < n; i++) tone(1320, 0.05, 'sine', 0.05, w + i * 0.07); return w + n * 0.07 + 0.18; }, 0); },
+    notyet() { tone(330, 0.5, 'triangle', 0.06); tone(294, 0.7, 'triangle', 0.05, 0.4); },
+    stamp() { tone(90, 0.25, 'square', 0.12, 0, 50); },
+    // the finale forest: filtered noise wind, breathing, synthesized birds
+    startWind() {
+      if (!ok() || wind) return null;
+      resume();
+      const src = ctx.createBufferSource(); src.buffer = noise(); src.loop = true;
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 700; bp.Q.value = 0.6;
+      const g = ctx.createGain(); g.gain.value = 0.0001;
+      const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 0.13; lg.gain.value = 0.18;
+      lfo.connect(lg); lg.connect(g.gain);
+      const lfo2 = ctx.createOscillator(), lg2 = ctx.createGain(); lfo2.frequency.value = 0.07; lg2.gain.value = 400;
+      lfo2.connect(lg2); lg2.connect(bp.frequency);
+      // breathing: low noise with a 4 s envelope
+      const bsrc = ctx.createBufferSource(); bsrc.buffer = noise(); bsrc.loop = true;
+      const blp = ctx.createBiquadFilter(); blp.type = 'lowpass'; blp.frequency.value = 380;
+      const bg = ctx.createGain(); bg.gain.value = 0.0;
+      const blfo = ctx.createOscillator(), blg = ctx.createGain(); blfo.frequency.value = 0.25; blg.gain.value = 0.07;
+      blfo.connect(blg); blg.connect(bg.gain);
+      const an = ctx.createAnalyser(); an.fftSize = 1024;
+      src.connect(bp); bp.connect(g); bsrc.connect(blp); blp.connect(bg);
+      g.connect(an); bg.connect(an); an.connect(master);
+      const t = ctx.currentTime;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 3);
+      [src, lfo, lfo2, bsrc, blfo].forEach((n) => n.start());
+      const birds = setInterval(() => {
+        if (Math.random() < 0.5) return;
+        const f = 2400 + Math.random() * 1600, w = Math.random() * 0.2;
+        for (let i = 0; i < 2 + (Math.random() * 3 | 0); i++) tone(f * (1 + i * 0.05), 0.09, 'sine', 0.03, w + i * 0.11, f * 1.35);
+      }, 1700);
+      wind = { stop() { clearInterval(birds); const t1 = ctx.currentTime; g.gain.cancelScheduledValues(t1); g.gain.setValueAtTime(g.gain.value || 0.2, t1); g.gain.exponentialRampToValueAtTime(0.0001, t1 + 1.5); bg.gain.value = 0; setTimeout(() => { [src, lfo, lfo2, bsrc, blfo].forEach((n) => { try { n.stop(); } catch (e) {} }); }, 1700); }, analyser: an };
+      return wind;
+    },
+    stopWind() { if (wind) { wind.stop(); wind = null; } },
+    get analyser() { return wind && wind.analyser; },
+  };
+  return api;
+})();
+
+// LIGHT LAG — canvas renderer. render(ctx, geom, F) draws one frame of a level
+// at visual time F.now-1+F.p. mode 'seen' = what Home sees/calculates;
+// mode 'true' = god's-eye (truth replay).
+const COL = {
+  bg: '#050a17', home: '#fff3d6', drone: '#f3d68c', der: '#aab0ba', relay: '#4fd8c8', wat: '#b993ff',
+  world: '#a8d2ff', amber: '#ffb547', order: '255,238,206', ask: '196,160,255', flash: '243,214,140', reply: '170,240,200',
+  text: '#dfe6f2', dim: 'rgba(200,215,240,0.55)', sign: '#7cf0b0', object: '#ff8a8a',
+};
+const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const SQ3 = Math.sqrt(3);
+const FDIRS = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
+
+function makeGeom(w, h, R) {
+  const size = Math.min(w / (SQ3 * (2 * R + 1) + 0.3), h / (3 * R + 2 + 0.3));
+  const cx = w / 2, cy = h / 2;
+  const px = (q, r) => [cx + size * SQ3 * (q + r / 2), cy + size * 1.5 * r];
+  function hexAt(x, y) {
+    const fx = (x - cx) / size, fy = (y - cy) / size;
+    const q = (SQ3 / 3 * fx - fy / 3), r = (2 / 3) * fy;
+    // cube round
+    let X = q, Z = r, Y = -X - Z;
+    let rx = Math.round(X), ry = Math.round(Y), rz = Math.round(Z);
+    const dx = Math.abs(rx - X), dy = Math.abs(ry - Y), dz = Math.abs(rz - Z);
+    if (dx > dy && dx > dz) rx = -ry - rz; else if (dy > dz) ry = -rx - rz; else rz = -rx - ry;
+    const h = [rx + 0, rz + 0];
+    return SIM.ring(h) <= R ? h : null;
+  }
+  const cells = [];
+  for (let q = -R; q <= R; q++) for (let r = -R; r <= R; r++) if (SIM.ring([q, r]) <= R) cells.push([q, r]);
+  return { w, h, R, size, cx, cy, px, hexAt, cells };
+}
+
+const ease = (p) => p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+const easeOut = (p) => 1 - Math.pow(1 - p, 3);
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+function mixColor(a, b, t) { return a.map((v, i) => Math.round(lerp(v, b[i], t))); }
+
+function hexPath(ctx, x, y, s) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30); const X = x + s * Math.cos(a), Y = y + s * Math.sin(a); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+  ctx.closePath();
+}
+function frontPath(ctx, g, c, r) {
+  const [x, y] = g.px(c[0], c[1]);
+  ctx.beginPath();
+  FDIRS.forEach((d, i) => {
+    const X = x + g.size * SQ3 * (d[0] + d[1] / 2) * r, Y = y + g.size * 1.5 * d[1] * r;
+    i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
+  });
+  ctx.closePath();
+}
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+// text with a dark halo so it stays legible over hexes, fronts and tracks
+function haloText(ctx, text, x, y, color, halo = 'rgba(5,10,23,0.9)', lw = 3) {
+  ctx.lineJoin = 'round'; ctx.strokeStyle = halo; ctx.lineWidth = lw; ctx.strokeText(text, x, y);
+  ctx.fillStyle = color; ctx.fillText(text, x, y);
+}
+function sparkle(ctx, x, y, s, color, a, rot = 0) {
+  ctx.save(); ctx.globalAlpha = a; ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const an = i * Math.PI / 4 + rot, k = i % 2 ? 0.6 : 1;
+    ctx.moveTo(x + Math.cos(an) * s * 0.25, y + Math.sin(an) * s * 0.25); ctx.lineTo(x + Math.cos(an) * s * k, y + Math.sin(an) * s * k);
+    ctx.moveTo(x - Math.cos(an) * s * 0.25, y - Math.sin(an) * s * 0.25); ctx.lineTo(x - Math.cos(an) * s * k, y - Math.sin(an) * s * k);
+  }
+  ctx.stroke(); ctx.restore();
+}
+// an event landing: a ring that opens and settles, plus short rays while it moves
+function burst(ctx, x, y, s, color, po, rays, settled) {
+  ctx.save(); ctx.strokeStyle = color; ctx.lineCap = 'round';
+  ctx.globalAlpha = po >= 1 ? settled : Math.max(settled, 1 - 0.8 * po); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x, y, s * (0.55 + 0.75 * po), 0, 7); ctx.stroke();
+  if (rays && po < 1) {
+    ctx.globalAlpha = 1 - po; ctx.lineWidth = 1.6; ctx.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8, r0 = s * (0.7 + 0.5 * po), r1 = r0 + s * 0.35 * (1 - po * 0.5); ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0); ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1); }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function droneShape(ctx, x, y, s) {
+  ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x + s * 0.9, y + s * 0.7); ctx.lineTo(x - s * 0.9, y + s * 0.7); ctx.closePath();
+}
+function derShape(ctx, x, y, s) {
+  ctx.beginPath();
+  const k = [1, 0.82, 0.95, 0.78, 1, 0.86, 0.92];
+  for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; const X = x + Math.cos(a) * s * k[i], Y = y + Math.sin(a) * s * k[i]; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+  ctx.closePath();
+}
+function watShape(ctx, x, y, s) {
+  ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y); ctx.closePath();
+}
+
+// position of an object in the frame (pixel), interpolated across the transition
+function objAt(F, key, n) {
+  const h = F.res.hist[key];
+  if (!h) return null;
+  if (F.mode === 'true') {
+    const p = h[n];
+    if (p && key.startsWith('der:') && F.exitTrue[key.slice(4)] !== undefined && n >= F.exitTrue[key.slice(4)]) return null;
+    return p || null;
+  }
+  if (key.startsWith('der:')) {
+    const id = key.slice(4), ex = F.exitSeen[id];
+    if (ex !== undefined && n >= ex) return null;
+  }
+  const s = SIM.seenPos(h, n);
+  return s ? s[1] : null;
+}
+function interp(F, g, key) {
+  const n = F.now, p = ease(F.p);
+  const b = objAt(F, key, n);
+  if (!b) return null;
+  const a = F.p < 1 ? objAt(F, key, n - 1) : null;
+  const B = g.px(b[0], b[1]);
+  if (!a) return { x: B[0], y: B[1], hex: b, alpha: F.p < 1 ? p : 1 };
+  const A = g.px(a[0], a[1]);
+  return { x: lerp(A[0], B[0], p), y: lerp(A[1], B[1], p), hex: b, alpha: 1 };
+}
+
+// Ring-age labels go on the spoke that the level leaves most empty.
+// (diagonal spokes only: on a horizontal spoke the labels run into each other)
+const SPOKES = [[-1, 1], [0, 1], [0, -1], [1, -1]];
+const spokeCache = new WeakMap();
+function ringSpoke(F) {
+  const L = F.level;
+  if (spokeCache.has(L)) return spokeCache.get(L);
+  const occ = new Set(), add = (p) => { if (p) occ.add(p[0] + ',' + p[1]); };
+  for (const key in F.res.hist) {
+    if (key.startsWith('wat:')) continue;
+    const h = F.res.hist[key];
+    for (const t in h) if (+t >= -6 && +t <= 14) add(h[t]); // the opening years matter most
+  }
+  for (const w of L.watchers || []) if (!w.hidden) { add(w.pos); if (w.split) add(w.split.pos); }
+  for (const r of L.receivers || []) add(r.cell);
+  if (L.world) add(L.world.pos);
+  if (L.standing) add(L.standing.target);
+  let best = SPOKES[0], bs = Infinity;
+  const pref = [0, 0.1, 0.6, 0.7]; // quiet labels belong low on the board
+  for (const [i, d] of SPOKES.entries()) {
+    let sc = pref[i];
+    for (let k = 1; k <= L.R; k++) {
+      if (occ.has(d[0] * k + ',' + d[1] * k)) sc += k === 1 ? 3 : 1;
+      if (occ.has(d[0] * k + ',' + (d[1] * k + 1))) sc += 0.25; // the hex just below the label
+    }
+    if (sc < bs) { bs = sc; best = d; }
+  }
+  spokeCache.set(L, best);
+  return best;
+}
+
+// Greedy placement for pills (arrival tags, ages): try a few spots around the
+// anchor and keep the one that overlaps least with objects and other pills.
+function rectOverlap(a, b) {
+  const x = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), y = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return x > 0 && y > 0 ? x * y / Math.max(1, Math.min(a.w * a.h, b.w * b.h)) : 0;
+}
+function layoutPills(ctx, g, pills, occ) {
+  const placed = [];
+  pills.map((p, i) => [p, i]).sort((a, b) => b[0].prio - a[0].prio || a[1] - b[1]).forEach(([it]) => {
+    ctx.font = `600 ${it.fs}px ${FONT}`;
+    const w = Math.ceil(ctx.measureText(it.text).width) + 12, h = Math.round(it.fs + 7), gp = it.gap;
+    const below = [0, gp + h / 2], above = [0, -(gp + h / 2)], right = [gp + w / 2 + 1, 0], left = [-(gp + w / 2 + 1), 0];
+    const below2 = [0, gp + h * 1.5 + 2], above2 = [0, -(gp + h * 1.5 + 2)];
+    const dr = [gp * 0.7 + w / 2, gp * 0.7 + h / 2], dl = [-(gp * 0.7 + w / 2), gp * 0.7 + h / 2];
+    const ur = [gp * 0.7 + w / 2, -(gp * 0.7 + h / 2)], ul = [-(gp * 0.7 + w / 2), -(gp * 0.7 + h / 2)];
+    const cands = it.prefer === 'above' ? [above, below, ur, ul, right, left, above2, below2, dr, dl]
+      : [below, above, dr, dl, right, left, below2, above2, ur, ul];
+    let best = null, bc = Infinity, bi = 0;
+    cands.forEach(([dx, dy], i) => {
+      const r = { x: Math.round(it.x + dx - w / 2), y: Math.round(it.y + dy - h / 2), w, h };
+      let c = i * 0.15;
+      if (r.x < 1 || r.y < 1 || r.x + w > g.w - 1 || r.y + h > g.h - 1) c += 30;
+      for (const p of placed) c += 14 * rectOverlap(r, p);
+      for (const o of occ) c += o.wt * rectOverlap(r, o);
+      if (c < bc) { bc = c; best = r; bi = i; }
+    });
+    placed.push(best);
+    // a pill pushed off to the side keeps a thin leader to what it labels
+    if (bi >= 2) {
+      const qx = Math.max(best.x, Math.min(it.x, best.x + best.w)), qy = Math.max(best.y, Math.min(it.y, best.y + best.h));
+      const d = Math.hypot(qx - it.x, qy - it.y);
+      if (d > gp * 0.9) {
+        const ax = it.x + (qx - it.x) / d * gp * 0.8, ay = it.y + (qy - it.y) / d * gp * 0.8;
+        ctx.save(); ctx.globalAlpha = it.alpha * 0.55; ctx.strokeStyle = it.color; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(qx, qy); ctx.stroke(); ctx.restore();
+      }
+    }
+    drawPill(ctx, best, it);
+  });
+}
+function drawPill(ctx, r, it) {
+  ctx.save(); ctx.globalAlpha = it.alpha;
+  ctx.font = `600 ${it.fs}px ${FONT}`;
+  roundRect(ctx, r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1, r.h / 2);
+  ctx.fillStyle = it.quiet ? 'rgba(5,10,23,0.78)' : 'rgba(5,10,23,0.92)'; ctx.fill();
+  ctx.strokeStyle = it.color; ctx.globalAlpha = it.alpha * (it.quiet ? 0.45 : 1); ctx.lineWidth = 1; ctx.stroke();
+  ctx.globalAlpha = it.alpha; ctx.fillStyle = it.color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(it.text, r.x + r.w / 2, r.y + r.h / 2 + 0.5);
+  ctx.restore();
+}
+
+function render(ctx, g, F) {
+  const L = F.level, R = L.R, s = g.size, T = F.clock || 0, RM = !!F.reduced;
+  const seen = F.mode === 'seen';
+  const vt = F.now - 1 + F.p;                              // linear visual time
+  const po = F.p >= 1 ? 1 : easeOut(F.p), pe = F.p >= 1 ? 1 : ease(F.p);
+  const vf = F.now - 1 + po;                               // fronts ease out within each year
+  const osc = (per, ph = 0) => (RM ? 0 : Math.sin(T / per + ph));
+  const occ = [], pills = [];
+  const keep = (x, y, r, wt = 6) => occ.push({ x: x - r, y: y - r, w: 2 * r, h: 2 * r, wt });
+  const smallFs = Math.round(Math.max(10, Math.min(12, s * 0.46)));
+  ctx.fillStyle = COL.bg; ctx.fillRect(0, 0, g.w, g.h);
+  // stars
+  if (F.stars) { ctx.fillStyle = '#ffffff'; for (const st of F.stars) { ctx.globalAlpha = st[2] * (0.6 + 0.4 * osc(1300, st[3])); ctx.fillRect(st[0] * g.w, st[1] * g.h, 1.2, 1.2); } ctx.globalAlpha = 1; }
+  // hexes (warm at home, cool at rim)
+  const warm = [44, 36, 30], cool = [12, 22, 40];
+  for (const c of g.cells) {
+    const [x, y] = g.px(c[0], c[1]);
+    const t = SIM.ring(c) / R;
+    const m = mixColor(warm, cool, Math.min(1, t * 1.05));
+    hexPath(ctx, x, y, s * 0.97);
+    ctx.fillStyle = `rgb(${m[0]},${m[1]},${m[2]})`; ctx.fill();
+    ctx.strokeStyle = 'rgba(160,185,230,0.10)'; ctx.lineWidth = 1; ctx.stroke();
+  }
+  // ring age labels on the emptiest spoke
+  if (seen && !F.noLabels) {
+    const sp = ringSpoke(F), fs = Math.round(Math.max(10, Math.min(11.5, s * 0.44)));
+    ctx.save(); ctx.font = `500 ${fs}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let k = 1; k <= R; k++) {
+      const [x, y0] = g.px(sp[0] * k, sp[1] * k), y = y0 + s * 0.56;
+      const txt = k === 1 ? '1 yr ago' : `${k} yrs`, w = ctx.measureText(txt).width;
+      haloText(ctx, txt, x, y, `rgba(${mixColor([255, 236, 205], [150, 175, 215], k / R).join(',')},0.62)`, 'rgba(5,10,23,0.55)', 2.5);
+      occ.push({ x: x - w / 2, y: y - fs / 2, w, h: fs, wt: 1.2 });
+    }
+    ctx.restore();
+  }
+  // highlights (tutorial)
+  for (const hl of F.ui.highlight || []) {
+    const [x, y] = g.px(hl[0], hl[1]);
+    ctx.save(); ctx.globalAlpha = RM ? 0.8 : 0.5 + 0.35 * osc(240);
+    hexPath(ctx, x, y, s * 0.92); ctx.fillStyle = 'rgba(255,243,214,0.08)'; ctx.fill();
+    ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.restore();
+  }
+
+  // ---------- fronts (clipped to the board) ----------
+  let txFlash = 0;
+  ctx.save();
+  frontPath(ctx, g, SIM.HOME, R + 0.62); ctx.clip();
+  for (const pu of F.res.pulses) {
+    if (pu.t > vt) continue;
+    const r = vf - pu.t;
+    if (r < 0 || r > R + 1.6) continue;
+    if (pu.standing && seen && vt < pu.t + SIM.ring(pu.src)) continue;
+    if (pu.from === 'HOME' && pu.t === F.now - 1 && F.p < 1) txFlash = Math.max(txFlash, 1 - po); // TRANSMIT acknowledged
+    const rgb = pu.kind === 'order' ? COL.order : pu.to ? COL.ask : COL.flash;
+    const a = clamp01((R + 0.9 - r) / 1.4) * (pu.kind === 'order' ? 0.6 : 0.88);
+    const rr = Math.max(0.02, r);
+    // soft glow under the leading edge while it moves
+    frontPath(ctx, g, pu.src, rr);
+    ctx.setLineDash([]); ctx.strokeStyle = `rgba(${rgb},${a * (seen ? 0.12 : 0.22)})`; ctx.lineWidth = seen ? 4 : 6; ctx.stroke();
+    ctx.setLineDash(seen ? [5, 5] : []); ctx.strokeStyle = `rgba(${rgb},${a})`; ctx.lineWidth = 1.6; ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  // true mode: the news of each objective event travelling home
+  if (!seen && F.newsEvents) {
+    for (const e of F.newsEvents) {
+      const r = vt - e.t, d = SIM.ring(e.pos);
+      if (r < 0 || r > d + 0.3) continue;
+      frontPath(ctx, g, e.pos, Math.max(0.02, r));
+      ctx.strokeStyle = 'rgba(255,243,214,0.18)'; ctx.lineWidth = 7; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,243,214,0.95)'; ctx.lineWidth = 2.2; ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // ---------- finale world ----------
+  if (F.fin) drawWorld(ctx, g, F, vt, { osc, keep, pills, RM, po, smallFs });
+
+  // ---------- drone positions (seen ghost + calculated) ----------
+  const dpos = {};
+  for (const id of Object.keys(L.drones || {})) {
+    const key = 'drone:' + id;
+    const gh = interp(F, g, key);
+    let calc = null;
+    if (seen) {
+      const indep = F.fin && F.fin.standingAt !== null && F.now >= F.fin.standingAt;
+      const tp = F.res.hist[key][F.now];
+      if (tp && !indep) {
+        const pa = F.p < 1 ? F.res.hist[key][F.now - 1] : null;
+        let [x, y] = g.px(tp[0], tp[1]);
+        if (pa) { const [x0, y0] = g.px(pa[0], pa[1]); x = lerp(x0, x, pe); y = lerp(y0, y, pe); }
+        calc = { x, y };
+      }
+    }
+    dpos[id] = { gh, calc };
+  }
+  // queued / in-flight move lines and target reticles (under the objects)
+  for (const t of F.ui.moveLines || []) {
+    const d = dpos[t.who], from = d && (d.calc || d.gh);
+    if (!from) continue;
+    const [x, y] = g.px(t.target[0], t.target[1]);
+    ctx.save(); ctx.strokeStyle = t.queued ? 'rgba(243,214,140,0.95)' : 'rgba(243,214,140,0.5)'; ctx.lineWidth = 1.5;
+    const ang = Math.atan2(y - from.y, x - from.x), rr = s * 0.68, len = Math.hypot(x - from.x, y - from.y);
+    if (len > rr + 2) { ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(x - Math.cos(ang) * rr, y - Math.sin(ang) * rr); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.beginPath();
+    for (let i = 0; i < 4; i++) { const a0 = i * Math.PI / 2 + Math.PI / 4; ctx.moveTo(x + Math.cos(a0 - 0.42) * rr, y + Math.sin(a0 - 0.42) * rr); ctx.arc(x, y, rr, a0 - 0.42, a0 + 0.42); }
+    ctx.stroke();
+    ctx.restore();
+    keep(x, y, s * 0.72, 3);
+  }
+
+  // ---------- derelict tracks + projections (seen mode; year ticks read over the reticles) ----------
+  for (const d of L.derelicts || []) {
+    const unlocked = seen && F.unlock[d.id] !== null && F.unlock[d.id] !== undefined && F.now >= F.unlock[d.id];
+    if (!unlocked) continue;
+    const tp = F.res.hist['der:' + d.id][F.now];
+    if (!tp || (F.exitTrue[d.id] !== undefined && F.now >= F.exitTrue[d.id])) continue;
+    const fut = derFuture(d, F.now, R);
+    const [px0, py0] = g.px(tp[0], tp[1]);
+    const fresh = F.now === F.unlock[d.id] ? pe : 1; // the track draws itself in on the unlock year
+    ctx.save(); ctx.setLineDash([2, 5]); ctx.strokeStyle = 'rgba(190,198,210,0.55)'; ctx.lineWidth = 1.5;
+    ctx.globalAlpha = fresh;
+    ctx.beginPath(); ctx.moveTo(px0, py0);
+    for (const f of fut) { const [x, y] = g.px(f.pos[0], f.pos[1]); ctx.lineTo(x, y); }
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = `600 ${smallFs - 1}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const f of fut) {
+      const [x, y] = g.px(f.pos[0], f.pos[1]);
+      ctx.fillStyle = 'rgba(200,206,216,0.85)'; ctx.beginPath(); ctx.arc(x, y, 2, 0, 7); ctx.fill();
+      const txt = 'yr ' + f.t, ty = y + s * 0.5, w = ctx.measureText(txt).width;
+      haloText(ctx, txt, x, ty, 'rgba(206,212,222,0.8)', 'rgba(5,10,23,0.85)', 3);
+      occ.push({ x: x - w / 2, y: ty - smallFs / 2, w, h: smallFs, wt: 2 });
+    }
+    ctx.restore();
+  }
+
+  // ---------- relays (fixed) ----------
+  for (const rc of L.receivers || []) {
+    if (!rc.cell) continue;
+    const [x, y] = g.px(rc.cell[0], rc.cell[1]);
+    const on = relayOn(F, rc.id);
+    ctx.save();
+    if (on) { ctx.shadowColor = COL.relay; ctx.shadowBlur = 18; }
+    ctx.fillStyle = on ? COL.relay : 'rgba(79,216,200,0.25)'; ctx.strokeStyle = COL.relay; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.rect(x - s * 0.36, y - s * 0.36, s * 0.72, s * 0.72); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    label(ctx, x, y, rc.id, on ? '#032' : COL.relay, s);
+    needDots(ctx, x, y + s * 0.6, rc.need, s);
+    keep(x, y, s * 0.5);
+  }
+
+  // ---------- derelicts (seen images, solid) ----------
+  for (const d of L.derelicts || []) {
+    const o = interp(F, g, 'der:' + d.id);
+    if (!o) continue;
+    const tagged = eventSeen(F, (e) => e.type === 'tag' && e.data[0] === d.id);
+    ctx.save(); ctx.globalAlpha = o.alpha * (tagged ? 0.55 : 1);
+    derShape(ctx, o.x, o.y, s * 0.42); ctx.fillStyle = COL.der; ctx.fill();
+    ctx.strokeStyle = '#d6dae0'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+    const ride = (L.receivers || []).find((r) => r.ride === d.id);
+    if (ride) { const on = relayOn(F, ride.id); ctx.save(); ctx.globalAlpha = o.alpha; ctx.strokeStyle = COL.relay; ctx.lineWidth = on ? 3 : 2; if (on) { ctx.shadowColor = COL.relay; ctx.shadowBlur = 16; } ctx.beginPath(); ctx.arc(o.x, o.y, s * 0.6, 0, 7); ctx.stroke(); ctx.restore(); needDots(ctx, o.x, o.y + s * 0.8, ride.need, s); }
+    label(ctx, o.x, o.y, d.id, '#1a1d22', s * 0.85);
+    if (tagged) { ctx.save(); ctx.strokeStyle = COL.drone; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(o.x, o.y, s * 0.55, 0, 7); ctx.stroke(); ctx.restore(); }
+    keep(o.x, o.y, s * (ride ? 0.66 : 0.48));
+    if (seen && !F.noLabels) {
+      const sp = SIM.seenPos(F.res.hist['der:' + d.id], F.now);
+      if (sp) { const age = F.now - sp[0]; pills.push({ x: o.x, y: o.y, gap: s * (ride ? 0.66 : 0.5), text: age <= 0 ? 'now' : `${age} yr${age === 1 ? '' : 's'} ago`, color: 'rgba(206,212,222,0.95)', alpha: 0.9 * o.alpha, fs: smallFs - 1, prio: 1, prefer: 'above', quiet: true }); }
+    }
+  }
+  // projection NOW markers (dashed = calculated)
+  if (seen) for (const d of L.derelicts || []) {
+    if (!(F.unlock[d.id] !== null && F.unlock[d.id] !== undefined && F.now >= F.unlock[d.id])) continue;
+    if (F.exitTrue[d.id] !== undefined && F.now >= F.exitTrue[d.id]) continue;
+    const tp = F.res.hist['der:' + d.id][F.now];
+    if (!tp) continue;
+    const pa = F.p < 1 ? F.res.hist['der:' + d.id][F.now - 1] : null;
+    let [x, y] = g.px(tp[0], tp[1]);
+    if (pa) { const [x0, y0] = g.px(pa[0], pa[1]); x = lerp(x0, x, pe); y = lerp(y0, y, pe); }
+    const first = F.now === F.unlock[d.id];
+    const sc = first ? (F.p < 1 ? 1.8 - 0.8 * po : 1 + 0.12 * osc(160)) : 1; // snaps in on the unlock year
+    ctx.save(); ctx.globalAlpha = first ? Math.max(0.15, pe) : 1;
+    ctx.setLineDash([4, 3]); ctx.strokeStyle = '#e4e8ee'; ctx.lineWidth = 1.6;
+    derShape(ctx, x, y, s * 0.42 * sc); ctx.stroke();
+    const ride = (L.receivers || []).find((r) => r.ride === d.id);
+    if (ride) { ctx.strokeStyle = COL.relay; ctx.beginPath(); ctx.arc(x, y, s * 0.6, 0, 7); ctx.stroke(); }
+    ctx.setLineDash([]);
+    ctx.font = `800 ${Math.round(Math.max(9, Math.min(10.5, s * 0.4)))}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    haloText(ctx, 'NOW', x, y + 0.5, '#f1f4f8', 'rgba(5,10,23,0.95)', 3);
+    ctx.restore();
+    keep(x, y, s * (ride ? 0.66 : 0.48));
+  }
+
+  // ---------- watchers ----------
+  for (const w of F.res.wat) {
+    const hidden = w.hidden && !F.showHidden;
+    if (seen) {
+      // split children are only drawn once seen
+      if (w.born > 0 && w.born + SIM.ring(w.pos) > F.now) continue;
+    } else if (w.born > F.now) continue;
+    if (hidden) continue;
+    let ra = 1;
+    if (w.hidden && F.reveal) { const r0 = F.reveal[w.id]; if (r0 === undefined || vt < r0) continue; ra = clamp01((vt - r0) / 0.8); }
+    const [x, y] = g.px(w.pos[0], w.pos[1]);
+    const signed = eventSeen(F, (e) => e.type === 'sign' && e.data === w.id);
+    const off = eventSeen(F, (e) => e.type === 'offended' && e.data === w.id);
+    const fresh = seen && w.born > 0 && w.born + SIM.ring(w.pos) === F.now;
+    ctx.save();
+    ctx.globalAlpha = (fresh ? pe : 1) * ra;
+    if (w.hidden && F.reveal) { ctx.strokeStyle = 'rgba(185,147,255,0.5)'; ctx.lineWidth = 1.5; hexPath(ctx, x, y, s * (0.92 + 0.5 * (1 - ra))); ctx.stroke(); }
+    watShape(ctx, x, y, s * 0.46);
+    ctx.fillStyle = w.kind === 'mirror' ? 'rgba(185,147,255,0.35)' : COL.wat; ctx.fill();
+    ctx.strokeStyle = '#e1d2ff'; ctx.lineWidth = 1.2; ctx.stroke();
+    if (w.kind === 'precedent') { ctx.strokeStyle = 'rgba(225,210,255,0.8)'; watShape(ctx, x, y, s * 0.62); ctx.stroke(); }
+    ctx.restore();
+    if (w.kind !== 'mirror') label(ctx, x, y, w.id === 'R2' ? 'R′' : w.id, '#1b0f33', s * 0.85);
+    const pop = (e) => (e && (seen ? SIM.seenTick(e) : e.t) === F.now && F.p < 1 ? 1 + 0.7 * (1 - po) : 1);
+    if (signed) badge(ctx, x + s * 0.5, y - s * 0.46, '✓', COL.sign, s * pop(signed));
+    if (off) badge(ctx, x + s * 0.5, y - s * 0.46, '✕', COL.object, s * pop(off));
+    keep(x, y, s * (w.kind === 'precedent' ? 0.64 : 0.5));
+  }
+
+  // ---------- events (pops) ----------
+  const evNow = (e) => seen ? SIM.seenTick(e) === F.now : e.t === F.now;
+  const steady = F.p < 1 ? 1 : (RM ? 0.75 : 0.55 + 0.25 * osc(300));
+  for (const e of F.res.events) {
+    if (e.type === 'order_rx' && seen && e.t === F.now) {
+      // Home calculates the moment its order lands: a dashed tick around the drone
+      const d = dpos[e.data[0]], c = d && d.calc;
+      if (!c) continue;
+      ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = COL.drone; ctx.lineWidth = 1.6;
+      ctx.globalAlpha = F.p < 1 ? 1 - 0.75 * po : 0.25;
+      ctx.beginPath(); ctx.arc(c.x, c.y, s * (0.62 + 0.45 * po), 0, 7); ctx.stroke(); ctx.restore();
+      continue;
+    }
+    if (!evNow(e)) continue;
+    const [x, y] = g.px(e.pos[0], e.pos[1]);
+    if (e.type === 'glint') {
+      const w = F.res.wat.find((q) => q.id === e.data);
+      const faint = w && w.hidden && !F.showHidden;
+      sparkle(ctx, x, y, s * (0.32 + 0.28 * po), faint ? '#d9c8ff' : '#f0e6ff', steady * (faint ? 0.75 : 1), RM ? 0 : po * 0.5);
+    } else if (e.type === 'tag') burst(ctx, x, y, s, COL.drone, po, true, 0.3);
+    else if (e.type === 'rec_on') burst(ctx, x, y, s, COL.relay, po, true, 0.3);
+    else if (e.type === 'sign') burst(ctx, x, y, s, COL.sign, po, false, 0.25);
+    else if (e.type === 'offended') burst(ctx, x, y, s, COL.object, po, false, 0.25);
+    else if (e.type === 'flash') {
+      if (seen && e.pos[0] === 0 && e.pos[1] === 0) continue;
+      ctx.save(); ctx.globalAlpha = steady; ctx.fillStyle = e.data[1] ? 'rgba(196,160,255,0.5)' : 'rgba(243,214,140,0.55)';
+      ctx.beginPath(); ctx.arc(x, y, s * (0.5 + (F.p < 1 ? 0.25 * (1 - po) : 0)), 0, 7); ctx.fill(); ctx.restore();
+    }
+  }
+
+  // ---------- drones ----------
+  for (const id of Object.keys(L.drones || {})) {
+    const { gh, calc } = dpos[id];
+    const apart = calc && gh && (Math.abs(calc.x - gh.x) > 1 || Math.abs(calc.y - gh.y) > 1);
+    if (apart) {
+      ctx.save(); ctx.strokeStyle = 'rgba(243,214,140,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(gh.x, gh.y); ctx.lineTo(calc.x, calc.y); ctx.stroke(); ctx.restore();
+    }
+    if (gh) {
+      ctx.save(); ctx.globalAlpha = gh.alpha * (apart ? 0.7 : 1);
+      droneShape(ctx, gh.x, gh.y + s * 0.05, s * 0.5); ctx.fillStyle = COL.drone; ctx.fill(); ctx.restore();
+      label(ctx, gh.x, gh.y + s * 0.12, id, '#2a2000', s * 0.8);
+      keep(gh.x, gh.y, s * 0.55);
+    }
+    if (calc) {
+      ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = COL.drone; ctx.lineWidth = 1.6;
+      droneShape(ctx, calc.x, calc.y + s * 0.05, s * 0.62); ctx.stroke(); ctx.restore();
+      if (apart) label(ctx, calc.x, calc.y + s * 0.14, id, 'rgba(243,214,140,0.85)', s * 0.62);
+      keep(calc.x, calc.y, s * 0.62);
+    }
+    if (F.ui.selected === id) {
+      const c = calc || gh;
+      if (c) { ctx.save(); ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2; ctx.globalAlpha = RM ? 0.9 : 0.65 + 0.35 * osc(200); ctx.beginPath(); ctx.arc(c.x, c.y, s * 0.88, 0, 7); ctx.stroke(); ctx.restore(); keep(c.x, c.y, s * 0.9, 2); }
+    }
+  }
+
+  // ---------- home ----------
+  {
+    const [x, y] = g.px(0, 0);
+    const conf = F.confirm && F.now === F.confirm.at ? F.confirm : null;
+    // the light of the confirming event has just reached Home
+    if (conf) {
+      ctx.save();
+      for (const pt of conf.pts) {
+        const [ex, ey] = g.px(pt[0], pt[1]);
+        const gr = ctx.createLinearGradient(ex, ey, x, y);
+        const a = F.p < 1 ? 0.25 + 0.75 * po : (RM ? 0.6 : 0.5 + 0.15 * osc(420));
+        gr.addColorStop(0, `rgba(255,243,214,${0.1 * a})`); gr.addColorStop(1, `rgba(255,243,214,${0.85 * a})`);
+        ctx.strokeStyle = gr; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(x, y); ctx.stroke();
+      }
+      if (F.p < 1) { ctx.strokeStyle = `rgba(255,243,214,${1 - po})`; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, s * (0.5 + 2.6 * po), 0, 7); ctx.stroke(); }
+      ctx.restore();
+    }
+    const glow = 1 + (conf ? 0.6 : 0) + 0.9 * txFlash;
+    ctx.save();
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, s * 1.3 * glow);
+    gr.addColorStop(0, `rgba(255,243,214,${Math.min(0.9, 0.55 + 0.3 * txFlash)})`); gr.addColorStop(1, 'rgba(255,243,214,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, s * 1.3 * glow, 0, 7); ctx.fill();
+    ctx.fillStyle = COL.home; ctx.beginPath(); ctx.arc(x, y, s * 0.3, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,243,214,0.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, s * 0.5, 0, 7); ctx.stroke();
+    if (F.ui.selected === 'HOME') { ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2; ctx.globalAlpha = RM ? 0.9 : 0.65 + 0.35 * osc(200); ctx.beginPath(); ctx.arc(x, y, s * 0.88, 0, 7); ctx.stroke(); }
+    ctx.restore();
+    keep(x, y, s * 0.55);
+  }
+
+  // ---------- tags ----------
+  // identical tags on the same hex merge ("reaches yr 7 ×2" is the relay puzzle's answer)
+  const groups = new Map();
+  for (const tg of F.ui.tags || []) {
+    const k = tg.pos.join(',') + '|' + tg.text;
+    const gr = groups.get(k);
+    if (gr) { gr.n++; gr.queued = gr.queued || tg.queued; } else groups.set(k, { tg, n: 1, queued: !!tg.queued });
+  }
+  const anyQueued = (F.ui.tags || []).some((t) => t.queued);
+  for (const { tg, n, queued } of groups.values()) {
+    const [x, y] = g.px(tg.pos[0], tg.pos[1]);
+    pills.push({ x, y, gap: s * 0.55, text: tg.text + (n > 1 ? ` ×${n}` : ''), color: tg.color || COL.drone, alpha: queued ? 1 : anyQueued ? 0.6 : 0.82, fs: smallFs, prio: queued ? 3 : 2, prefer: 'below' });
+  }
+  layoutPills(ctx, g, pills, occ);
+}
+
+function drawWorld(ctx, g, F, vt, K) {
+  const fin = F.fin, W = FIN.W, s = g.size, T = F.clock || 0, seen = F.mode === 'seen', { osc, RM } = K;
+  const [x, y] = g.px(W[0], W[1]);
+  const lag = seen ? FIN.WR : 0;
+  const n = F.now;
+  // leak halo: every year from true 1
+  if (n - lag >= 1) {
+    ctx.save(); ctx.globalAlpha = RM ? 0.35 : 0.25 + 0.2 * osc(90) * osc(370);
+    ctx.strokeStyle = COL.world; ctx.lineWidth = 1; ctx.setLineDash([1, 3]);
+    ctx.beginPath(); ctx.arc(x, y, s * 0.95, 0, 7); ctx.stroke(); ctx.restore();
+  }
+  const gr = ctx.createRadialGradient(x - s * 0.15, y - s * 0.15, s * 0.05, x, y, s * 0.6);
+  gr.addColorStop(0, '#e6f3ff'); gr.addColorStop(0.6, COL.world); gr.addColorStop(1, '#3a6aa8');
+  ctx.save(); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, s * 0.52, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(200,230,255,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, s * 0.68, 0, 7); ctx.stroke(); ctx.restore();
+  K.keep(x, y, s * 0.72);
+  // call this year
+  if (fin.calls.includes(n - lag)) {
+    const ph = RM ? 0.35 : (T % 1600) / 1600;
+    ctx.save(); ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = 1 - ph; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, s * (0.6 + ph * 0.9), 0, 7); ctx.stroke(); ctx.restore();
+    blips(ctx, x, y - s * 1.2, [2, 3, 5, 7], '#ffffff', s, RM ? null : T);
+    K.keep(x, y - s * 1.05, s * 0.45, 4);
+  }
+  if (FIN.NOTYET.includes(n - lag)) {
+    const ph = RM ? 0.3 : ((T + 800) % 2000) / 2000;
+    ctx.save(); ctx.strokeStyle = COL.amber; ctx.globalAlpha = (1 - ph) * 0.8; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, s * (0.55 + ph * 0.6), 0, 7); ctx.stroke(); ctx.restore();
+    K.pills.push({ x, y, gap: s * 0.75, text: 'NOT YET', color: COL.amber, alpha: 0.95, fs: K.smallFs, prio: 1.5, prefer: 'below' });
+  }
+  // true-mode fronts from W: calls, not-yet, reply
+  if (!seen) {
+    const fr = [];
+    for (const c of fin.calls) fr.push([c, '255,255,255', 0.8]);
+    for (const c of FIN.NOTYET) fr.push([c, '255,181,71', 0.6]);
+    if (fin.replyEmit !== null) fr.push([fin.replyEmit, COL.reply, 1]);
+    for (const [t0, rgb, a] of fr) {
+      const r = vt - t0; if (r < 0 || r > 6.5) continue;
+      ctx.save(); ctx.strokeStyle = `rgba(${rgb},${a * Math.max(0, 1 - r / 6.5)})`; ctx.lineWidth = rgb === COL.reply ? 3 : 1.4; frontPath(ctx, g, W, Math.max(0.02, r)); ctx.stroke(); ctx.restore();
+    }
+  }
+  // their probe
+  if (fin.probe) {
+    const ps = seen ? FIN.probeSeen(n) : (FIN.probePos(n) ? [n, FIN.probePos(n)] : null);
+    if (ps) {
+      const [px, py] = g.px(ps[1][0], ps[1][1]);
+      ctx.save(); ctx.fillStyle = '#cfe6ff'; ctx.translate(px + s * 0.35, py + s * 0.3); ctx.rotate(Math.atan2(-py + g.cy, -px + g.cx) + Math.PI / 2);
+      ctx.beginPath(); ctx.moveTo(0, -s * 0.3); ctx.lineTo(s * 0.2, s * 0.25); ctx.lineTo(-s * 0.2, s * 0.25); ctx.closePath(); ctx.fill(); ctx.restore();
+      K.keep(px + s * 0.35, py + s * 0.3, s * 0.35);
+    }
+  }
+  ctx.save(); ctx.font = `700 ${Math.round(Math.max(10, Math.min(13, s * 0.5)))}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  haloText(ctx, 'W', x, y + s * 0.98, COL.world); ctx.restore();
+  K.keep(x, y + s * 0.98, s * 0.3, 4);
+}
+
+function blips(ctx, x, y, groups, color, s, T) {
+  const total = groups.reduce((a, b) => a + b, 0) + groups.length - 1;
+  const w = s * 0.14; let i = 0;
+  ctx.save(); ctx.fillStyle = color;
+  const lit = T === null ? total : Math.floor((T / 90) % (total + 8));
+  for (let gi = 0; gi < groups.length; gi++) {
+    for (let k = 0; k < groups[gi]; k++) { ctx.globalAlpha = i <= lit ? 0.95 : 0.2; ctx.fillRect(x - total * w / 2 + i * w, y, w * 0.6, w * 1.6); i++; }
+    i++;
+  }
+  ctx.restore();
+}
+
+function label(ctx, x, y, text, color, s) {
+  ctx.save(); ctx.font = `700 ${Math.max(9, Math.min(14, s * 0.5))}px ${FONT}`; ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y + 0.5); ctx.restore();
+}
+function badge(ctx, x, y, ch, color, s) {
+  ctx.save(); ctx.fillStyle = 'rgba(5,10,23,0.92)'; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(x, y, s * 0.26, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = color; ctx.font = `800 ${Math.max(9, s * 0.34)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, x, y + 0.5); ctx.restore();
+}
+function needDots(ctx, x, y, n, s) {
+  ctx.save(); ctx.fillStyle = COL.relay;
+  for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(x + (i - (n - 1) / 2) * s * 0.2, y, Math.max(1.4, s * 0.06), 0, 7); ctx.fill(); }
+  ctx.restore();
+}
+
+function eventSeen(F, pred) {
+  for (const e of F.res.events) if (pred(e) && (F.mode === 'seen' ? SIM.seenTick(e) <= F.now : e.t <= F.now)) return e;
+  return null;
+}
+function relayOn(F, id) { return !!eventSeen(F, (e) => e.type === 'rec_on' && e.data === id); }
+
+// future hex entries of a derelict after year `now` while on the board
+function derFuture(d, now, R) {
+  const dir = SIM.DIRS[d.dir], out = [];
+  let pos = derPosAt(d, now), t = now;
+  // next step time
+  let nx = d.first; while (nx <= now) nx += d.period;
+  for (let k = 0; k < 12; k++) {
+    pos = [pos[0] + dir[0], pos[1] + dir[1]]; t = nx; nx += d.period;
+    if (SIM.ring(pos) > R) break;
+    out.push({ pos, t });
+  }
+  return out;
+}
+function derPosAt(d, t) {
+  const dir = SIM.DIRS[d.dir]; let steps = 0;
+  if (t >= d.first) steps = Math.floor((t - d.first) / d.period) + 1;
+  return [d.pos[0] + dir[0] * steps, d.pos[1] + dir[1] * steps];
+}
+
+// LIGHT LAG — game state, UI and flow.
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const nm = (id) => (id === 'R2' ? 'R\u2032' : id);
+const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const ANIM = 380;
+
+// ---------- persistence (graceful without storage) ----------
+const SAVE_KEY = 'lightlag.v1';
+let store = null;
+try { store = window.localStorage; store.getItem(SAVE_KEY); } catch (e) { store = null; }
+function loadSave() {
+  let s = null;
+  try { s = store ? JSON.parse(store.getItem(SAVE_KEY) || 'null') : null; } catch (e) { s = null; }
+  const d = { reached: 1, endingsFound: [], settings: { sound: true, reduced: false }, codex: [], cleared: [], tutorialDone: false, seenOpening: false };
+  if (!s || typeof s !== 'object') return d;
+  return Object.assign(d, s, { settings: Object.assign(d.settings, s.settings || {}) });
+}
+function persist() { try { if (store) store.setItem(SAVE_KEY, JSON.stringify(G.save)); } catch (e) {} }
+
+const G = {
+  save: loadSave(), n: 1, L: null, plan: [], queue: [], now: 0, p: 1, animT0: 0,
+  res: null, out: null, fin: null, unlock: {}, exitSeen: {}, exitTrue: {},
+  sel: null, mode: 'move', logs: [], hint: 0, won: false, flags: {}, glintIdx: 0, tut: -1,
+  locked: false, ff: null, finIntro: 3, ui: { tags: [], moveLines: [], highlight: [] }, outInfo: [],
+};
+AU.on = G.save.settings.sound;
+const mqReduce = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+const reduced = () => G.save.settings.reduced || mqReduce.matches;
+const actOf = (n) => (n <= 4 ? 1 : n <= 7 ? 2 : 3);
+const levelData = (n) => (n === 8 ? FINALE_LEVEL : LEVELS_JSON[n - 1]);
+const STARS = Array.from({ length: 70 }, () => [Math.random(), Math.random(), 0.15 + Math.random() * 0.5, Math.random() * 6]);
+
+// ---------- canvas ----------
+const canvas = $('board'), ctx = canvas.getContext('2d');
+let geom = null, lastLayout = '';
+const CHIP_ROW = 44 + 6; // an outbox or chips row plus the dock gap
+function layout() {
+  if (!G.L) return;
+  const wrap = $('boardwrap'), dock = $('dock');
+  const w = wrap.clientWidth, top = wrap.getBoundingClientRect().top;
+  // Size and place the board against the tallest dock (outbox and chips both
+  // showing), so the board never moves when orders are queued or a drone is selected.
+  const dockMax = dock.offsetHeight + ($('outbox').childElementCount ? 0 : CHIP_ROW) + ($('chips').childElementCount ? 0 : CHIP_ROW);
+  const avail = Math.floor(dock.getBoundingClientRect().bottom - top - dockMax);
+  const side = Math.max(140, Math.floor(Math.min(w - 8, avail - 4)));
+  const mt = Math.max(0, Math.floor((avail - side) / 2));
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  const key = [side, mt, dpr, G.L.R].join();
+  if (key === lastLayout && geom) return;
+  lastLayout = key;
+  canvas.style.width = side + 'px'; canvas.style.height = side + 'px'; canvas.style.marginTop = mt + 'px';
+  canvas.width = Math.round(side * dpr); canvas.height = Math.round(side * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  geom = makeGeom(side, side, G.L.R);
+}
+window.addEventListener('resize', () => { layout(); if (replayCtl) replayCtl.resize(); });
+if (window.ResizeObserver) new ResizeObserver(() => layout()).observe($('boardwrap'));
+
+// the light of the last required event reaching Home (drawn on the confirming year)
+function confirmFx() {
+  if (!G.won) return null;
+  if (G.out) return { at: G.out.confirmed_at_home, pts: G.out.req.filter((e) => SIM.seenTick(e) === G.out.confirmed_at_home).map((e) => e.pos) };
+  if (G.fin && G.fin.endSeen !== null) return { at: G.fin.endSeen, pts: [G.fin.forward ? G.fin.forward.pos : FIN.W] };
+  return null;
+}
+function frame() {
+  return {
+    level: G.L, res: G.res, now: G.now, p: G.p, mode: 'seen', unlock: G.unlock, exitSeen: G.exitSeen, exitTrue: G.exitTrue,
+    showHidden: false, fin: G.fin, clock: performance.now(), stars: STARS, ui: Object.assign({ selected: G.sel }, G.ui),
+    reduced: reduced(), confirm: confirmFx(),
+  };
+}
+const tickbar = $('tickbar');
+let tickOn = false;
+function loop(t) {
+  if (G.p < 1) G.p = Math.max(0, Math.min(1, (t - G.animT0) / ANIM));
+  // a hairline under the top bar fills while each year passes
+  if (G.p < 1) { tickbar.style.transform = `scaleX(${G.p.toFixed(3)})`; if (!tickOn) { tickbar.classList.add('on'); tickOn = true; } }
+  else if (tickOn) { tickbar.style.transform = 'scaleX(1)'; tickbar.classList.remove('on'); tickOn = false; }
+  if (G.L && geom && $('overlay').classList.contains('hidden')) { render(ctx, geom, frame()); if (G.beat) drawBeat(ctx, geom, t); }
+  if (replayCtl) replayCtl.tick(t);
+  if (waveCtl) waveCtl(t);
+  if (interCtl) interCtl(t);
+  requestAnimationFrame(loop);
+}
+
+// ---------- level lifecycle ----------
+function resim() {
+  G.res = SIM.simulate(G.L, G.plan, 80);
+  G.exitSeen = {}; G.exitTrue = {};
+  for (const e of G.res.events) if (e.type === 'exit') { G.exitTrue[e.data] = e.t; G.exitSeen[e.data] = SIM.seenTick(e); }
+  G.out = G.L.objective.type === 'finale' ? null : SIM.outcome(G.L, G.plan, 80, G.res);
+  G.fin = G.L.world ? FIN.analyse(G.L, G.plan, G.res) : null;
+}
+function loadLevel(n) {
+  stopFF(); stopHold();
+  G.levelToken = (G.levelToken || 0) + 1;
+  G.n = n; G.L = levelData(n); G.plan = []; G.queue = []; G.now = 0; G.p = 1; G.sel = null; G.mode = 'move';
+  G.won = false; G.flags = { chg: {} }; G.glintIdx = 0; G.hint = 0; G.locked = false; G.logs = []; G.beat = null;
+  G.unlock = {};
+  for (const d of G.L.derelicts || []) G.unlock[d.id] = SIM.firstSeenMove(G.L, d.id);
+  G.tut = n === 1 && !G.save.tutorialDone ? 0 : -1;
+  G.finIntro = n === 8 ? 0 : 3;
+  resim(); layout(); clearCoach();
+  for (const l of SCRIPT[n].startLog || []) addLog(l);
+  if (G.tut === 0) setCoach('Tap your drone.');
+  if (n === 8) finIntroShow();
+  updateUI();
+}
+
+function advance() {
+  if (G.beat) endBeat();
+  finishAnim();
+  const sent = G.queue.length;
+  for (const o of G.queue) G.plan.push(Object.assign({ t: G.now }, o));
+  G.queue = [];
+  if (sent) {
+    resim(); AU.thoom(); G.sel = null; G.mode = 'move';
+    const pr = $('primary'); pr.classList.remove('sent'); void pr.offsetWidth; pr.classList.add('sent');
+  }
+  G.now++;
+  G.p = reduced() ? 1 : 0; G.animT0 = performance.now();
+  const news = processYear(G.now);
+  tutorialAfterAdvance(sent);
+  updateUI();
+  return news;
+}
+function finishAnim() { G.p = 1; }
+
+function processYear(n) {
+  const res = G.res; let news = false;
+  for (const e of res.events) if (e.t === n && e.type === 'order_rx') { news = true; AU.tick(); }
+  let hiddenGlint = null, glint = false;
+  for (const e of res.events) {
+    if (SIM.seenTick(e) !== n) continue;
+    if (e.type === 'flash' && SIM.eq(e.pos, SIM.HOME)) continue;
+    news = true;
+    if (e.type === 'glint') {
+      const w = res.wat.find((q) => q.id === e.data);
+      if (w && w.hidden) hiddenGlint = w; else glint = true;
+    } else if (e.type === 'sign') { AU.sign(); addLog(`${nm(e.data)} signed. (Year ${e.t}, seen year ${n}.)`); }
+    else if (e.type === 'offended') { AU.object(); onOffended(e); }
+    else if (e.type === 'tag') { AU.tag(); addLog(`Seen: ${e.data[1]} tagged ${e.data[0]} in year ${e.t}.`); }
+    else if (e.type === 'rec_on') { AU.wake(); addLog(`Seen: the relay woke in year ${e.t}.`); }
+    else if (e.type === 'exit') onExit(e);
+    else if (e.type === 'split') { addLog(`${nm(e.data[0])} has divided. ${nm(e.data[1])} has been independent since year ${e.t}. Nobody has asked it anything.`); unlockCodex('split'); setCoach(`${nm(e.data[0])} has divided. Requests addressed to ${nm(e.data[0])} do not count for ${nm(e.data[1])}.`, { dismiss: true }); }
+    else if (e.type === 'declined') addLog(`${e.data[0]}: noted.`);
+    else if (e.type === 'standing') addLog(`${e.data[0]} has accepted standing. Home can no longer calculate where it is.`);
+  }
+  if (hiddenGlint) {
+    AU.chime();
+    const lines = SCRIPT[G.n].glints || [];
+    const t = G.glintIdx < lines.length ? lines[G.glintIdx] : 'Filed.';
+    G.glintIdx++;
+    addLog(t.replace('{ring}', SIM.ring(hiddenGlint.pos)));
+  } else if (glint) AU.chime();
+  // seen image changes: news + discoveries
+  for (const key of Object.keys(res.hist)) {
+    if (key.startsWith('wat:')) continue;
+    const a = SIM.seenPos(res.hist[key], n - 1), b = SIM.seenPos(res.hist[key], n);
+    if (!a || !b || SIM.eq(a[1], b[1])) continue;
+    news = true;
+    const chg = G.flags.chg[key] = G.flags.chg[key] || [];
+    chg.push(n);
+    if (key.startsWith('der:') && G.n >= 2 && chg.length >= 2 && chg[chg.length - 2] === n - 2 && SIM.ring(b[1]) < SIM.ring(a[1]) && !has('hurry')) discover('hurry');
+    if (key.startsWith('drone:') && chg.length >= 2 && chg[chg.length - 2] === n - 1 && SIM.ring(b[1]) < SIM.ring(a[1]) && !has('fastdrone')) discover('fastdrone');
+  }
+  for (const id in G.unlock) if (G.unlock[id] === n) {
+    news = true;
+    if (G.tut < 0 || G.tut >= 4) addLog(`Home has now seen ${id} move. Its dashed marker shows where it is now.`);
+  }
+  if (G.out && G.out.confirmed_at_home === n && !G.won) onWin();
+  if (G.n === 8) news = finaleYear(n) || news;
+  return news;
+}
+const has = (k) => G.save.codex.includes(k);
+function unlockCodex(k) { if (!has(k)) { G.save.codex.push(k); persist(); } }
+// a discovery gets the whole line, not a truncated log entry
+function discover(k) {
+  unlockCodex(k); addLog(CODEX[k].b);
+  if (!(G.tut >= 0 && G.tut < 4)) setCoach(CODEX[k].b, { dismiss: true, kicker: 'Codex · ' + CODEX[k].t });
+}
+
+function onOffended(e) {
+  const N = Math.min(...e.cause);
+  const who = nm(e.data);
+  addLog(e.tie ? `${who} objected. Two requests reached it in the same year, and a tie is not "first".` : `${who} objected. It heard someone else's request first.`,
+    { label: `Rewind to year ${N}`, fn: () => rewindTo(N) });
+  if (G.n === 6) {
+    const askers = {};
+    for (const o of G.plan) if (o.kind === 'FLASH' && o.arg) (askers[o.who] = askers[o.who] || new Set()).add(o.arg);
+    if (Object.values(askers).some((s) => s.has('P') && s.has('Q')) && !has('departure')) discover('departure');
+  }
+}
+function onExit(e) {
+  const id = e.data, d = G.res.ders.find((x) => x.id === id);
+  if (d.tagged !== null) { addLog(`${id} has left the board.`); return; }
+  const obj = G.L.objective;
+  let fatal = false;
+  if (obj.type === 'tag') fatal = obj.ids.includes(id);
+  else if (obj.type === 'tag_any') fatal = (G.L.derelicts || []).every((x) => G.exitSeen[x.id] !== undefined && G.exitSeen[x.id] <= G.now && G.res.ders.find((y) => y.id === x.id).tagged === null);
+  else if (obj.type === 'rec') { const r = (G.L.receivers || []).find((q) => q.ride === id); fatal = !!r && !G.res.recs.find((q) => q.id === r.id).active; }
+  if (fatal) {
+    const tx = G.plan.filter((o) => o.t < G.now).map((o) => o.t);
+    const N = tx.length ? Math.max(...tx) : Math.max(0, ...Object.values(G.unlock).filter((x) => x !== null));
+    addLog(`${id} has left the board ${obj.type === 'rec' ? 'with the relay asleep' : 'untagged'}.`, { label: `Rewind to year ${N}`, fn: () => rewindTo(N) });
+  } else addLog(`${id} has left the board untagged. There is another one coming.`);
+}
+
+function onWin() {
+  G.won = true; stopFF(); AU.chord();
+  const o = G.out;
+  if (!G.save.cleared.includes(G.n)) G.save.cleared.push(G.n);
+  G.save.reached = Math.max(G.save.reached, G.n + 1);
+  if (G.n === 1) { G.save.tutorialDone = true; unlockCodex('dilation'); }
+  if (G.n === 6) unlockCodex('lightcone');
+  persist();
+  addLog(`Confirmed. It happened in year ${o.happened_at}. You found out in year ${o.confirmed_at_home}.`);
+  setCoach(`Confirmed. It happened in year ${o.happened_at}. You found out in year ${o.confirmed_at_home}.`);
+  updateUI();
+  const token = G.levelToken;
+  setTimeout(() => { if (G.won && G.levelToken === token) showWin(); }, reduced() ? 900 : 1800);
+}
+
+function rewindTo(y) {
+  if (G.locked) return;
+  y = Math.max(0, Math.min(y, G.now));
+  finishAnim(); stopFF();
+  G.plan = G.plan.filter((o) => o.t < y); G.queue = []; G.now = y; G.won = false; G.sel = null; G.mode = 'move'; G.beat = null;
+  if (G.tut >= 0 && G.tut < 4) { G.tut = 4; }
+  clearCoach(); resim(); addLog(`Rewound to year ${y}.`); updateUI();
+}
+
+// ---------- tutorial (L1, first time) ----------
+function tutorialAfterAdvance(sent) {
+  if (G.tut === 2 && sent) { G.tut = 3; setCoach('WAIT.'); }
+  else if (G.tut === 3 && G.now >= 2) {
+    G.tut = 4;
+    const t = 'Home has now seen it move. The dashed marker is where it is now. Your drone is chasing a memory. Re-aim.';
+    addLog(t); setCoach(t, { dismiss: true });
+  }
+}
+function tutTap(hex) {
+  if (G.tut === 0) {
+    if (hex && droneAtHex(hex) === 'A') { select('A'); G.tut = 1; setCoach('Tap the derelict. You are seeing it as it was 4 years ago.'); }
+    else toast('Tap your drone first: the gold triangle.');
+  } else if (G.tut === 1) {
+    const sp = SIM.seenPos(G.res.hist['der:D1'], G.now);
+    if (hex && sp && SIM.eq(hex, sp[1])) {
+      queueMove('A', hex); G.tut = 2;
+      // before the first TRANSMIT, show the two delays apart on this very order
+      startBeat('A', hex, () => setCoach('TRANSMIT. Your order travels at the speed of light.'));
+    } else toast('Tap the derelict at the top.');
+  } else if (G.tut === 2) toast('Tap TRANSMIT.');
+  else if (G.tut === 3) toast('Tap WAIT.');
+  updateUI();
+}
+
+// ---------- the two delays: a watch-only beat ----------
+// Plays a hypothetical order on a cloned sim (nothing is sent, nothing in the
+// level changes): first the order's light-speed flight to the drone, then the
+// drone's half-light-speed flight. Tap to skip ahead; TRANSMIT ends it.
+const BEAT_YEAR = 900, BEAT_HOLD = 1500;
+function startBeat(who, target, done) {
+  const t0 = G.now;
+  const plan = G.plan.concat([{ t: t0, kind: 'MOVE', who, arg: target }]);
+  const res = SIM.simulate(G.L, plan, t0 + 24);
+  const rx = res.events.find((e) => e.type === 'order_rx' && e.sent === t0 && e.data[0] === who && e.data[1] === 'MOVE');
+  if (!rx) { done(); return; }
+  const h = res.hist['drone:' + who], steps = [];
+  for (let y = rx.t + 1; y <= t0 + 24 && steps.length < 2; y++) if (!SIM.eq(h[y], h[y - 1])) steps.push({ t: y, pos: h[y] });
+  G.beat = { who, t0, rx: rx.t, h, steps, phase: 0, start: performance.now(), done };
+  beatCoach();
+  updateUI();
+}
+function beatCoach() {
+  // kept to two short lines: on a 360x560 screen there are ~80 px between A and the dock
+  const b = G.beat;
+  if (b.phase === 0) setCoach('the order flies at light speed, a hex a year.', { tap: beatTap, quiet: true, lead: 'Delay 1:' });
+  else setCoach(b.steps.length ? `${b.who} flies at half that, a hex every 2 years.` : `${b.who} is already there.`, { tap: beatTap, quiet: true, lead: 'Delay 2:' });
+  coachAvoid([b.h[b.t0], [2, -4]]);
+}
+// if the card would still reach one of these hexes (a wide font, a short screen), tighten it
+function coachAvoid(hexes) {
+  const c = $('coach');
+  c.classList.remove('snug');
+  if (!geom || c.classList.contains('hidden')) return;
+  const hits = () => {
+    const cr = c.getBoundingClientRect(), br = canvas.getBoundingClientRect();
+    return hexes.some((h) => { if (!h) return false; const p = geom.px(h[0], h[1]), x = br.left + p[0], y = br.top + p[1], s = geom.size; return !(y + s < cr.top || y - s > cr.bottom || x + s < cr.left || x - s > cr.right); });
+  };
+  if (hits()) c.classList.add('snug');
+}
+// years covered by the current phase, and where the beat is inside it
+function beatSpan(b) { return b.phase === 0 ? [b.t0, b.rx] : [b.rx, b.steps.length ? b.steps[b.steps.length - 1].t : b.rx]; }
+function beatTick(t) {
+  const b = G.beat;
+  const [y0, y1] = beatSpan(b), run = reduced() ? 0 : (y1 - y0) * BEAT_YEAR;
+  const el = t - b.start;
+  b.y = Math.min(y1, y0 + (run ? Math.max(0, el) / BEAT_YEAR : y1 - y0));
+  if (!b.landed && b.phase === 0 && b.y >= y1) { b.landed = true; AU.tick(); }
+  if (b.phase === 1) { const k = b.steps.filter((s) => s.t <= b.y).length; if (k > (b.stepped || 0)) { b.stepped = k; AU.step(); } }
+  if (el >= run + (reduced() ? BEAT_HOLD * 2 : BEAT_HOLD)) beatTap();
+}
+function beatTap() {
+  const b = G.beat;
+  if (!b) return;
+  const [y0, y1] = beatSpan(b), el = performance.now() - b.start;
+  if (!reduced() && el < (y1 - y0) * BEAT_YEAR) { b.start = performance.now() - (y1 - y0) * BEAT_YEAR; return; } // jump to the end of this flight
+  if (b.phase === 0) { b.phase = 1; b.start = performance.now(); beatCoach(); return; }
+  endBeat();
+}
+function endBeat() {
+  const b = G.beat;
+  if (!b) return;
+  G.beat = null; clearCoach(); b.done(); updateUI();
+}
+// drawn over the board: dashed, because all of it is Home's calculation
+function drawBeat(c, g, t) {
+  beatTick(t);
+  const b = G.beat;
+  if (!b) return;
+  const s = g.size, y = b.y, fs = Math.round(Math.max(10, Math.min(12, s * 0.46)));
+  const P = (p) => g.px(p[0], p[1]);
+  const at = (yy) => {
+    const a = b.h[Math.floor(yy)], z = b.h[Math.ceil(yy)] || a, [ax, ay] = P(a), [zx, zy] = P(z), f = ease(yy - Math.floor(yy));
+    return [lerp(ax, zx, f), lerp(ay, zy, f)];
+  };
+  c.save();
+  c.fillStyle = 'rgba(5,10,23,0.55)'; c.fillRect(0, 0, g.w, g.h);
+  const pill = (x, yy, text, color) => {
+    c.font = `600 ${fs}px ${FONT}`;
+    const w = Math.ceil(c.measureText(text).width) + 12, hh = fs + 7, r = { x: Math.round(Math.max(2, Math.min(g.w - w - 2, x - w / 2))), y: Math.round(yy - hh / 2), w, h: hh };
+    drawPill(c, r, { text, color, alpha: 1, fs });
+  };
+  // Home, and the order's front: one hex per year
+  const [hx, hy] = P(SIM.HOME), dRx = SIM.dist(SIM.HOME, b.h[b.rx]);
+  const r = b.phase === 0 ? Math.min(dRx, y - b.t0) : dRx;
+  c.fillStyle = COL.home; c.beginPath(); c.arc(hx, hy, s * 0.3, 0, 7); c.fill();
+  if (r > 0.02) {
+    frontPath(c, g, SIM.HOME, r);
+    c.strokeStyle = `rgba(${COL.order},${b.phase === 0 ? 0.25 : 0.1})`; c.lineWidth = 5; c.stroke();
+    c.setLineDash([5, 5]); c.strokeStyle = `rgba(${COL.order},${b.phase === 0 ? 0.95 : 0.4})`; c.lineWidth = 1.8; c.stroke(); c.setLineDash([]);
+  }
+  // the drone (calculated: dashed) and, once moving, its trail
+  const [sx, sy] = P(b.h[b.rx]), [dx, dy] = b.phase === 0 ? P(b.h[Math.min(b.rx, Math.max(b.t0, Math.floor(y)))]) : at(y);
+  if (b.phase === 1 && (dx !== sx || dy !== sy)) { c.setLineDash([2, 4]); c.strokeStyle = 'rgba(243,214,140,0.7)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(sx, sy); for (const st of b.steps) if (st.t <= y) { const [qx, qy] = P(st.pos); c.lineTo(qx, qy); } c.lineTo(dx, dy); c.stroke(); c.setLineDash([]); }
+  c.setLineDash([3, 3]); c.strokeStyle = COL.drone; c.lineWidth = 1.8; droneShape(c, dx, dy + s * 0.05, s * 0.62); c.stroke(); c.setLineDash([]);
+  label(c, dx, dy + s * 0.14, b.who, 'rgba(243,214,140,0.95)', s * 0.62);
+  if (b.landed || b.phase === 1) {
+    c.setLineDash([3, 3]); c.strokeStyle = `rgba(243,214,140,${b.phase === 0 ? 0.9 : 0.35})`; c.lineWidth = 1.6; c.beginPath(); c.arc(sx, sy, s * 0.9, 0, 7); c.stroke(); c.setLineDash([]);
+    pill(sx, sy + s * 1.35, `order lands · yr ${b.rx}`, COL.home);
+  }
+  if (b.phase === 1) for (const st of b.steps) if (st.t <= y) { const [qx, qy] = P(st.pos); pill(qx, qy - s * 1.1, `yr ${st.t}`, COL.drone); }
+  // the beat's own clock
+  pill(Math.max(40, g.w * 0.14), fs + 6, `year ${Math.floor(y + 1e-6)}`, COL.home);
+  c.restore();
+}
+function canBeat() { return G.n === 1 && !G.won && !G.beat && !G.locked && !(G.tut >= 0 && G.tut < 4) && !!dronePosCalc('A'); }
+function replayBeat() {
+  const q = G.queue.find((o) => o.kind === 'MOVE' && o.who === 'A');
+  const sp = SIM.seenPos(G.res.hist['der:D1'], G.now);
+  const target = q ? q.arg : sp && !(G.exitSeen.D1 <= G.now) ? sp[1] : null;
+  if (!target) { toast('Nothing to aim at just now.'); return; }
+  G.sel = null; G.mode = 'move'; stopFF();
+  startBeat('A', target, () => {});
+}
+
+// ---------- selection & orders ----------
+function dronePosCalc(id) {
+  if (G.fin && G.fin.standingAt !== null && G.now >= G.fin.standingAt) return null;
+  return G.res.hist['drone:' + id][G.now] || null;
+}
+function droneAtHex(hex) {
+  for (const id of Object.keys(G.L.drones || {})) { const c = dronePosCalc(id); if (c && SIM.eq(c, hex)) return id; }
+  for (const id of Object.keys(G.L.drones || {})) { const s = SIM.seenPos(G.res.hist['drone:' + id], G.now); if (s && SIM.eq(s[1], hex)) return id; }
+  return null;
+}
+function knownWatchers() {
+  return G.res.wat.filter((w) => !w.hidden && (w.born === 0 || w.born + SIM.ring(w.pos) <= G.now));
+}
+function watcherAtHex(hex) { return knownWatchers().find((w) => SIM.eq(w.pos, hex)) || null; }
+function select(id) {
+  G.sel = id; G.mode = id === 'HOME' ? 'ask' : 'move';
+  if (G.tut === 4 || G.tut < 0) clearCoachIfDismiss();
+  AU.step(); updateUI();
+}
+function deselect() { G.sel = null; G.mode = 'move'; updateUI(); }
+function queueMove(id, hex) {
+  G.queue = G.queue.filter((o) => !(o.kind === 'MOVE' && o.who === id));
+  G.queue.push({ kind: 'MOVE', who: id, arg: hex });
+  AU.step(); updateUI();
+}
+function queueFlash(id, target) {
+  if (id === 'HOME') {
+    G.queue = G.queue.filter((o) => !(o.kind === 'PING' && o.arg === target));
+    G.queue.push({ kind: 'PING', who: 'HOME', arg: target });
+  } else {
+    G.queue = G.queue.filter((o) => !(o.kind === 'FLASH' && o.who === id));
+    G.queue.push({ kind: 'FLASH', who: id, arg: target });
+  }
+  AU.step();
+  if (id === 'HOME') { G.sel = null; G.mode = 'move'; } else G.mode = 'move';
+  updateUI();
+}
+function onBoardTap(x, y) {
+  AU.init(); stopFF();
+  if (!geom || G.locked) return;
+  if (G.beat) { beatTap(); return; } // the beat is watch-only: a tap moves it along
+  const hex = geom.hexAt(x, y);
+  if (G.n === 8 && G.finIntro < 3) { finIntroNext(); return; }
+  if (G.won) return;
+  if (G.tut >= 0 && G.tut < 4) { tutTap(hex); return; }
+  if (!hex) { deselect(); return; }
+  const droneId = droneAtHex(hex);
+  if (G.sel && G.sel !== 'HOME' && G.mode === 'move') {
+    if (droneId === G.sel) { deselect(); return; }
+    if (droneId) { select(droneId); return; }
+    if (G.n === 8 && G.fin.standingAt !== null && G.now >= G.fin.standingAt) { toast('V has standing. It no longer takes your orders.'); return; }
+    queueMove(G.sel, hex); return;
+  }
+  if (G.sel && G.mode === 'ask') {
+    const w = watcherAtHex(hex);
+    if (w) { queueFlash(G.sel, w.id); return; }
+    if (droneId) { select(droneId); return; }
+    toast('Ask cancelled.');
+    if (G.sel === 'HOME') deselect(); else { G.mode = 'move'; updateUI(); }
+    return;
+  }
+  if (droneId) { select(droneId); return; }
+  if (SIM.eq(hex, SIM.HOME) && actOf(G.n) === 2) { select('HOME'); return; }
+  if (G.sel) { deselect(); return; }
+  inspect(hex);
+}
+canvas.addEventListener('click', (ev) => {
+  const r = canvas.getBoundingClientRect();
+  onBoardTap(ev.clientX - r.left, ev.clientY - r.top);
+});
+
+// ---------- arrival tags ----------
+function unlockedNow(id) { const u = G.unlock[id]; return u !== null && u !== undefined && G.now >= u; }
+function knownTargets() {
+  const out = [];
+  for (const r of G.L.receivers || []) {
+    if (r.cell) out.push({ id: r.id, kind: 'fix', pos: r.cell, color: COL.relay });
+    else if (SIM.seenPos(G.res.hist['der:' + r.ride], G.now)) out.push({ id: r.id, kind: 'ride', ride: r.ride, color: COL.relay });
+  }
+  for (const w of knownWatchers()) {
+    // once Home has seen a watcher sign or object, other people's requests can't change it
+    const settled = G.res.events.some((e) => (e.type === 'sign' || e.type === 'offended') && e.data === w.id && SIM.seenTick(e) <= G.now);
+    out.push({ id: w.id, kind: 'fix', pos: w.pos, born: w.born, color: '#dccbff', settled });
+  }
+  if (G.L.world) out.push({ id: 'W', kind: 'fix', pos: FIN.W, color: COL.world });
+  return out;
+}
+function rideArrival(res, derId, t0, src) {
+  const h = res.hist['der:' + derId];
+  for (let t = t0; t <= 80; t++) { const p = h[t]; if (!p) return null; if (t - t0 >= SIM.dist(src, p)) return t; }
+  return null;
+}
+function computeTags() {
+  const tags = [], lines = [], info = [];
+  const q = G.queue.map((o) => Object.assign({ t: G.now, queued: true }, o));
+  const all = G.plan.concat(q);
+  const res = q.length ? SIM.simulate(G.L, all, 80) : G.res;
+  const known = knownTargets();
+  for (const o of all) {
+    let txt = '';
+    if (o.kind === 'MOVE') {
+      const rx = res.events.find((e) => e.type === 'order_rx' && e.sent === o.t && e.data[0] === o.who && e.data[1] === 'MOVE');
+      if (!rx) { if (o.queued) txt = ''; continue; }
+      const later = res.events.filter((e) => e.type === 'order_rx' && e.data[0] === o.who && (e.data[1] === 'MOVE' || e.data[1] === 'STANDING') && e.sent > o.t).map((e) => e.t);
+      const cutoff = later.length ? Math.min(...later) : 999;
+      const h = res.hist['drone:' + o.who];
+      let arr = null;
+      for (let t = rx.t; t <= 80 && t < cutoff; t++) if (SIM.eq(h[t], o.arg)) { arr = t; break; }
+      if (arr === null) continue;
+      if (!o.queued && arr <= G.now) continue;
+      tags.push({ pos: o.arg, text: `arrives yr ${arr}`, color: COL.drone, queued: !!o.queued });
+      lines.push({ who: o.who, target: o.arg, queued: !!o.queued });
+      txt = `arrives yr ${arr}`;
+    } else if (o.kind === 'FLASH' || o.kind === 'PING') {
+      let t0, src;
+      if (o.kind === 'PING') { t0 = o.t; src = SIM.HOME; }
+      else { const fe = res.events.find((e) => e.type === 'flash' && e.sent === o.t && e.data[0] === o.who); if (!fe) continue; t0 = fe.t; src = fe.pos; }
+      for (const k of known) {
+        let at, pos;
+        if (k.kind === 'ride') {
+          const tp = res.hist['der:' + k.ride][G.now];
+          pos = unlockedNow(k.ride) && tp ? tp : (SIM.seenPos(res.hist['der:' + k.ride], G.now) || [0, null])[1];
+          if (!pos) continue;
+          at = unlockedNow(k.ride) ? rideArrival(res, k.ride, t0, src) : '?';
+          if (at === null) continue;
+        } else {
+          pos = k.pos; at = t0 + SIM.dist(src, k.pos);
+          if (k.born && at < k.born) continue;
+        }
+        if (!o.queued && at !== '?' && at < G.now) continue;
+        const addressed = o.arg && k.id === o.arg;
+        if (G.L.world && k.id === 'W' && !addressed) continue;
+        if (k.settled && !addressed) continue;
+        tags.push({ pos, text: `${addressed ? '\u2192 ' : ''}reaches yr ${at}`, color: k.color, queued: !!o.queued });
+        if (addressed || (!o.arg && k.kind !== 'fix') || (!o.arg && G.L.receivers && G.L.receivers.some((r) => r.id === k.id))) txt = `reaches ${nm(k.id)} yr ${at}`;
+      }
+    } else if (o.kind === 'STANDING') {
+      const rx = res.events.find((e) => e.type === 'standing' && e.sent === o.t);
+      if (rx) txt = `reaches V yr ${rx.t}`;
+    }
+    if (o.queued) info.push(txt);
+  }
+  return { tags, lines, info };
+}
+
+// ---------- UI ----------
+let shownYear = null;
+function setText(id, text) { const el = $(id); if (el.textContent !== text) el.textContent = text; }
+function updateUI() {
+  const L = G.L; if (!L) return;
+  const ln = $('lvlname'), lnHTML = `<span class="n">${G.n} \u00b7</span>${esc(L.name)}`;
+  if (ln.innerHTML !== lnHTML) { ln.innerHTML = lnHTML; ln.classList.remove('tight'); }
+  if (!ln.classList.contains('tight') && ln.scrollWidth > ln.clientWidth + 1) ln.classList.add('tight'); // long names drop the number
+  // the year rolls only when it changes (not on every tap)
+  const yb = $('year').querySelector('b');
+  if (shownYear !== G.now) {
+    const fwd = shownYear !== null && G.now === shownYear + 1;
+    yb.textContent = G.now; shownYear = G.now;
+    yb.classList.remove('roll'); if (fwd) { void yb.offsetWidth; yb.classList.add('roll'); }
+  }
+  // objective
+  let obj = L.objective.text;
+  if (G.n === 8) obj = G.fin.sentYear !== null ? (G.fin.kind === 'delegate' || G.plan.some((o) => o.kind === 'STANDING') ? 'Petition 1: transferred to V.' : 'Petition 1: answered. Reply pending.') : 'Petition 1: pending.';
+  setText('objtext', obj);
+  // tags
+  const ct = computeTags();
+  const hl = [];
+  if (G.tut === 0) { const c = dronePosCalc('A'); if (c) hl.push(c); }
+  if (G.tut === 1) { const sp = SIM.seenPos(G.res.hist['der:D1'], G.now); if (sp) hl.push(sp[1]); }
+  G.ui = { tags: ct.tags, moveLines: ct.lines, highlight: hl };
+  // outbox
+  const ob = $('outbox');
+  const had = new Set([...ob.children].map((c) => c.dataset.k)); // only new orders animate in
+  ob.innerHTML = '';
+  G.queue.forEach((o, i) => {
+    const b = document.createElement('span'), k = [o.kind, o.who, o.arg].join('|');
+    b.className = 'chip out' + (had.has(k) ? ' old' : ''); b.dataset.k = k;
+    const what = o.kind === 'MOVE' ? 'move' : o.kind === 'STANDING' ? 'standing' : o.kind === 'PING' ? (o.arg === 'W' ? 'answer W' : `ask ${nm(o.arg)}`) : o.arg ? (o.arg === 'W' ? 'answer W' : `ask ${nm(o.arg)}`) : 'flash';
+    b.innerHTML = `<span class="who">${o.who === 'HOME' ? 'Home' : esc(o.who)}</span> \u2192 ${esc(what)}${ct.info[i] ? ` <span class="eta">\u00b7 ${esc(ct.info[i])}</span>` : ''}`;
+    if (G.tut !== 2) {
+      const x = document.createElement('button'); x.className = 'x'; x.setAttribute('aria-label', 'Remove order'); x.textContent = '\u2715';
+      x.onclick = (ev) => { ev.stopPropagation(); G.queue.splice(i, 1); updateUI(); };
+      b.appendChild(x);
+    }
+    ob.appendChild(b);
+  });
+  // chips
+  const ch = $('chips');
+  const hadAnswer = !!ch.querySelector('.answerBtn');
+  ch.innerHTML = '';
+  const chip = (label, cls, fn, aria) => { const b = document.createElement('button'); b.className = 'chip ' + (cls || ''); b.innerHTML = label; if (aria) b.setAttribute('aria-label', aria); b.onclick = (ev) => { ev.stopPropagation(); AU.init(); stopFF(); fn(); }; ch.appendChild(b); return b; };
+  const chipHint = (text) => { const h = document.createElement('span'); h.className = 'chip hint'; h.textContent = text; ch.appendChild(h); };
+  const fin = G.fin, callSeen = G.n === 8 && G.now >= 10;
+  const decisiveQueued = G.queue.some((o) => (o.arg === 'W') || o.kind === 'STANDING');
+  const decisiveSent = fin && fin.sentYear !== null;
+  if (G.sel && G.sel !== 'HOME' && !G.won && !G.locked) {
+    const id = G.sel;
+    chip('MOVE', G.mode === 'move' ? 'on' : '', () => { G.mode = 'move'; updateUI(); });
+    if (G.n >= 3 && G.n <= 4) chip('FLASH', '', () => { if (G.tut >= 0 && G.tut < 4) return; queueFlash(id, null); });
+    if (actOf(G.n) === 2) chip('ASK', 'violet' + (G.mode === 'ask' ? ' on' : ''), () => { G.mode = G.mode === 'ask' ? 'move' : 'ask'; updateUI(); if (G.mode === 'ask') toast('Tap a watcher to address the request.'); });
+    if (G.n === 8 && callSeen && !decisiveSent && !decisiveQueued) {
+      chip('ASK W', 'blue', () => confirmSheet('V answers them', `V will answer them from where it is. This cannot be recalled. Your order reaches V, V speaks, and its answer reaches them years later. They will be older than the voices you heard.`, 'Send', () => queueFlash('V', 'W')));
+      chip('STANDING', 'blue', () => confirmSheet('Give standing', 'Give V the right to decide. It will no longer take your orders.', 'Give standing', () => { G.queue = G.queue.filter((o) => o.who !== 'V'); G.queue.push({ kind: 'STANDING', who: 'V', arg: null }); G.sel = null; updateUI(); }));
+    }
+    chip('\u2715', '', deselect, 'Deselect');
+    // say what the next tap does, while there is room for it
+    if (ch.children.length <= 3 && !(G.tut >= 0 && G.tut < 4)) {
+      const aimed = G.queue.some((o) => o.kind === 'MOVE' && o.who === id);
+      chipHint(G.mode === 'ask' ? 'Tap a watcher.' : aimed ? 'Tap to re-aim.' : 'Tap a hex to aim.');
+    }
+  } else if (G.sel === 'HOME' && !G.won) {
+    chip('ASK', 'violet on', () => {});
+    chip('\u2715', '', deselect, 'Deselect');
+    chipHint('Tap a watcher.');
+  } else if (G.n === 8 && callSeen && !decisiveSent && !decisiveQueued && !G.locked && !G.won) {
+    const b = document.createElement('button'); b.className = 'answerBtn' + (hadAnswer ? ' old' : ''); b.textContent = 'Answer them';
+    b.onclick = () => { AU.init(); confirmSheet('Answer them', 'This cannot be recalled. It reaches them in 5 years, and they will be ten years older than the voices you heard.', 'Send', () => { G.queue.push({ kind: 'PING', who: 'HOME', arg: 'W' }); updateUI(); }); };
+    ch.appendChild(b);
+  }
+  ch.classList.toggle('compact', ch.querySelectorAll('button').length > 3);
+  const hint = ch.querySelector('.hint');
+  if (hint && ch.scrollWidth > ch.clientWidth + 1) hint.remove(); // never a clipped hint
+  // primary
+  const pr = $('primary');
+  let lab = 'WAIT \u25B8', state = '';
+  if (G.n === 8 && G.finIntro < 3) lab = 'CONTINUE \u25B8';
+  else if (G.queue.length) { lab = `TRANSMIT ${G.queue.length} \u25B8`; state = 'tx'; }
+  else if (G.n === 8 && decisiveSent) { lab = 'LISTENING \u25B8'; state = 'listen'; }
+  else if (G.n === 8 && callSeen) { lab = 'PENDING \u25B8'; state = 'pend'; }
+  if (G.locked) lab = G.n === 8 && !decisiveSent ? 'PENDING' : lab;
+  for (const c of ['tx', 'listen', 'pend']) pr.classList.toggle(c, c === state);
+  pr.classList.toggle('pulse', (G.tut === 2 && !G.beat) || G.tut === 3);
+  pr.disabled = !!(G.locked || G.won);
+  setText('primary', lab);
+  const ff = $('ff');
+  ff.disabled = G.n === 8 || G.won || G.locked || (G.tut >= 0 && G.tut < 4);
+  ff.classList.toggle('on', !!G.ff);
+  renderLogLine();
+}
+
+// log
+let logTimer = null, logShown = 0;
+function addLog(text, action) {
+  G.logs.push({ y: G.now, text, action: action || null });
+  scheduleLogLine();
+}
+function scheduleLogLine() {
+  if (logTimer) return;
+  const step = () => {
+    logTimer = null;
+    if (logShown < G.logs.length - 1) { logShown++; renderLogLine(true); logTimer = setTimeout(step, 1500); }
+    else if (logShown === G.logs.length - 1) renderLogLine(true);
+  };
+  if (logShown > G.logs.length - 1) logShown = G.logs.length - 1;
+  if (logShown < G.logs.length - 2) logShown = G.logs.length - 2; // don't lag too far behind
+  step();
+}
+let shownAct = null;
+function renderLogLine(fresh) {
+  const l = G.logs[Math.min(logShown, G.logs.length - 1)];
+  const lt = $('logtext'), la = $('logact');
+  lt.textContent = l ? l.text : '';
+  if (fresh) for (const el of [lt, $('log')]) { el.classList.remove('fresh'); void el.offsetWidth; el.classList.add('fresh'); }
+  // the newest open action (smart rewind) stays reachable
+  const act = [...G.logs].reverse().find((x) => x.action && !x.used && x.y <= G.now);
+  const want = act && !G.won ? act : null;
+  if (want === shownAct && (!want || la.childElementCount)) return;
+  shownAct = want; la.innerHTML = '';
+  if (want) {
+    const b = document.createElement('button'); b.textContent = want.action.label + ' \u21BA';
+    b.onclick = (ev) => { ev.stopPropagation(); want.used = true; want.action.fn(); };
+    la.appendChild(b);
+  }
+}
+
+// coach & toast
+let coachOpts = {};
+function setCoach(text, opts = {}) {
+  const c = $('coach'); coachOpts = opts;
+  c.classList.remove('snug');
+  c.innerHTML = (opts.kicker ? `<span class="kick">${esc(opts.kicker)}</span>` : '') + (opts.lead ? `<b class="lead">${esc(opts.lead)}</b> ` : '') + esc(text) + (opts.tap && !opts.quiet ? '<span class="more">TAP TO CONTINUE</span>' : opts.dismiss ? '<span class="more">TAP TO DISMISS</span>' : '');
+  c.classList.remove('hidden'); c.classList.toggle('tap', !!(opts.tap || opts.dismiss));
+}
+function clearCoach() { $('coach').classList.add('hidden'); coachOpts = {}; }
+function clearCoachIfDismiss() { if (coachOpts.dismiss) clearCoach(); }
+$('coach').addEventListener('click', (ev) => { ev.stopPropagation(); AU.init(); if (coachOpts.tap) coachOpts.tap(); else if (coachOpts.dismiss) clearCoach(); });
+let toastT = null;
+function toast(t) { const el = $('toast'); el.textContent = t; el.classList.remove('hidden'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.add('hidden'), 2200); }
+
+// ---------- until news ----------
+function untilNews() {
+  if ($('ff').disabled) return;
+  AU.init();
+  if (G.ff) { stopFF(); return; }
+  if (!G.save.ffSeen) { G.save.ffSeen = true; persist(); toast('Until news: years pass until something changes. Eight at most.'); }
+  let k = 0;
+  const step = () => {
+    if (!G.ff) return;
+    const news = advance(); k++;
+    if (news || k >= 8 || G.won) { stopFF(); return; }
+    G.ff = setTimeout(step, reduced() ? 140 : 440);
+  };
+  G.ff = setTimeout(step, 0);
+  updateUI();
+}
+function stopFF() { if (G.ff) { clearTimeout(G.ff); G.ff = null; const f = $('ff'); if (f) f.classList.remove('on'); } }
+
+// ---------- sheets ----------
+function openSheet(html, mount) {
+  $('sheetBody').innerHTML = html; $('sheet').classList.remove('hidden'); $('sheetBack').classList.remove('hidden');
+  $('sheetBody').scrollTop = 0;
+  if (mount) mount($('sheetBody'));
+}
+function closeSheet() { $('sheet').classList.add('hidden'); $('sheetBack').classList.add('hidden'); }
+$('sheetBack').addEventListener('click', closeSheet);
+$('sheetX').addEventListener('click', closeSheet);
+function confirmSheet(title, body, yes, fn) {
+  openSheet(`<h2>${esc(title)}</h2><p>${esc(body)}</p><div class="btnrow"><button id="cNo">Not yet</button><button class="go" id="cYes">${esc(yes)}</button></div>`, (el) => {
+    el.querySelector('#cNo').onclick = closeSheet;
+    el.querySelector('#cYes').onclick = () => { closeSheet(); fn(); };
+  });
+}
+
+function seenAgo(key) {
+  const s = SIM.seenPos(G.res.hist[key], G.now);
+  if (!s) return '';
+  const age = G.now - s[0];
+  return age <= 0 ? '<p class="age">Seen as it is now.</p>' : `<p class="age">Seen as it was ${age} yr${age === 1 ? '' : 's'} ago (year ${s[0]}).</p>`;
+}
+function tagsAt(hex) {
+  const t = G.ui.tags.filter((x) => SIM.eq(x.pos, hex)).map((x) => x.text);
+  return t.length ? `<p class="tagline">${t.map(esc).join(' \u00b7 ')}</p>` : '';
+}
+function inspect(hex) {
+  const L = G.L;
+  const parts = [];
+  // derelicts (seen image or NOW marker)
+  for (const d of L.derelicts || []) {
+    const sp = !(G.exitSeen[d.id] <= G.now) && SIM.seenPos(G.res.hist['der:' + d.id], G.now);
+    const tp = unlockedNow(d.id) && G.res.hist['der:' + d.id][G.now];
+    const atImg = sp && SIM.eq(sp[1], hex), atNow = tp && SIM.eq(tp, hex);
+    if (!atImg && !atNow) continue;
+    const ride = (L.receivers || []).find((r) => r.ride === d.id);
+    const tagged = G.res.events.find((e) => e.type === 'tag' && e.data[0] === d.id && SIM.seenTick(e) <= G.now);
+    parts.push(`<h2><span class="k">Derelict probe</span>${esc(d.id)}${atNow && !atImg ? ' \u00b7 calculated position' : ''}</h2>
+      <p>Ancient and unpowered. It drifts one light-year every ${d.period} years and will not change course for anyone.</p>
+      ${atImg ? seenAgo('der:' + d.id) : '<p class="age">Dashed: where Home calculates it is now.</p>'}
+      <p>${unlockedNow(d.id) ? 'Projection: on. Home has seen it move, so the dashed marker and dotted track show where it is and where it will be.' : 'Projection: off. Home has not yet seen it move, so it cannot say where it is now.'}</p>
+      ${ride ? `<p class="rule">Carries an old relay. It wakes if ${ride.need} open signals reach it in the same year.</p>` : ''}
+      ${tagged ? `<p>Tagged in year ${tagged.t}. Seen in year ${SIM.seenTick(tagged)}.</p>` : ''}${tagsAt(hex)}`);
+  }
+  for (const r of L.receivers || []) if (r.cell && SIM.eq(r.cell, hex)) {
+    const on = G.res.events.find((e) => e.type === 'rec_on' && e.data === r.id && SIM.seenTick(e) <= G.now);
+    parts.push(`<h2><span class="k">Relay</span>${esc(r.id)}</h2><p class="rule">Wakes if ${r.need} open signals reach it in the same year. Signals in different years do not add up.</p>
+      <p class="age">Ring ${SIM.ring(hex)}: what you see of it is ${SIM.ring(hex)} years old.</p>${on ? `<p>Woke in year ${on.t}. Seen in year ${SIM.seenTick(on)}.</p>` : ''}${tagsAt(hex)}`);
+  }
+  const w = watcherAtHex(hex);
+  if (w) {
+    const rule = w.kind === 'precedent' ? 'Will sign only if the first request it hears is addressed to it. A request for someone else arriving first, or in the same year, makes it object for good.' : w.kind === 'sign' ? 'Signs when it receives a request addressed to it.' : 'Acknowledges everything that reaches it.';
+    const st = G.res.events.find((e) => (e.type === 'sign' || e.type === 'offended') && e.data === w.id && SIM.seenTick(e) <= G.now);
+    parts.push(`<h2><span class="k">Watcher \u00b7 ${w.kind === 'precedent' ? 'precedent' : w.kind === 'sign' ? 'signer' : 'mirror'}</span>${esc(nm(w.id))}</h2>
+      <p class="rule">${esc(rule)}</p>${w.parent ? `<p class="rule">Requests addressed to ${esc(nm(w.parent))} do not count for ${esc(nm(w.id))}.</p>` : ''}
+      ${seenAgo('wat:' + w.id)}${st ? `<p>${st.type === 'sign' ? 'Signed' : 'Objected'} in year ${st.t}. Seen in year ${SIM.seenTick(st)}.</p>` : ''}${tagsAt(hex)}`);
+  }
+  if (L.world && SIM.eq(hex, FIN.W)) {
+    parts.push(`<h2><span class="k">Ring 5</span>A pale blue world</h2><p>Everything you know about it is five years old. Anything you say reaches it five years from now.</p>${G.now >= 10 ? '<p class="rule">It is asking. Some of it is saying not yet.</p>' : ''}${tagsAt(hex)}`);
+  }
+  if (L.world && G.fin.probe) { const ps = FIN.probeSeen(G.now); if (ps && SIM.eq(ps[1], hex)) parts.push(`<h2><span class="k">Their instrument</span>A probe</h2><p>Coming this way at half the speed of light. It appears to hurry. It isn't hurrying. Seen as it was ${G.now - ps[0]} years ago.</p>`); }
+  if (SIM.eq(hex, SIM.HOME)) parts.push(`<h2><span class="k">You</span>HOME</h2><p>An old, careful listening post. You see everything as it was. Your orders arrive late.</p>`);
+  if (!parts.length) { const r = SIM.ring(hex); toast(r === 0 ? 'Home.' : `Ring ${r}. Light from here is ${r} year${r === 1 ? '' : 's'} old.`); return; }
+  openSheet(parts.join('<hr>'));
+}
+
+function openMenu() {
+  AU.init();
+  const s = G.save.settings;
+  openSheet(`<h2><span class="k">Level ${G.n} · Year ${G.now}</span>${esc(G.L.name)}</h2><div class="menu">
+    <button id="mRestart">Restart level</button>
+    <button id="mRewind" ${G.now === 0 || G.locked ? 'disabled' : ''}>Rewind 1 year <span class="v">to year ${Math.max(0, G.now - 1)}</span></button>
+    <button id="mHint">Hint</button>
+    <div class="grid">
+      <button id="mLevels">Level select</button>
+      <button id="mLog">Home log</button>
+      <button id="mCodex">Codex <span class="v">${G.save.codex.length} of ${Object.keys(CODEX).length} found</span></button>
+      <button id="mScale">How light works</button>
+      <button id="mSound">Sound <span class="v${s.sound ? ' on' : ''}">${s.sound ? 'On' : 'Off'}</span></button>
+      <button id="mMotion">Reduced motion <span class="v${s.reduced || mqReduce.matches ? ' on' : ''}">${s.reduced ? 'On' : mqReduce.matches ? 'On (system)' : 'Off'}</span></button>
+    </div>
+  </div>`, (el) => {
+    el.querySelector('#mRestart').onclick = () => { closeSheet(); if (G.locked && G.n === 8) return; loadLevel(G.n); };
+    el.querySelector('#mRewind').onclick = () => { closeSheet(); rewindTo(G.now - 1); };
+    el.querySelector('#mHint').onclick = openHints;
+    el.querySelector('#mLevels').onclick = openLevels;
+    el.querySelector('#mLog').onclick = openLog;
+    el.querySelector('#mCodex').onclick = openCodex;
+    el.querySelector('#mScale').onclick = openScale;
+    el.querySelector('#mSound').onclick = () => { s.sound = !s.sound; AU.on = s.sound; persist(); openMenu(); };
+    el.querySelector('#mMotion').onclick = () => { s.reduced = !s.reduced; document.body.classList.toggle('reduced', s.reduced); persist(); openMenu(); };
+  });
+}
+function openHints() {
+  const h = SCRIPT[G.n].hints || [];
+  if (!h.length) { openSheet(`<h2>Hint</h2><p>There isn't a right answer. There are three honest ones.</p>`); return; }
+  if (G.hint === 0) G.hint = 1;
+  const shown = h.slice(0, G.hint);
+  openSheet(`<h2><span class="k">Hint ${G.hint} of ${h.length}</span>${esc(G.L.name)}</h2><div class="hints">${shown.map((x) => `<p>${esc(x)}</p>`).join('')}</div>
+    <div class="btnrow">${G.hint < h.length ? '<button id="hMore" class="go">Another hint</button>' : '<button id="hClose">Close</button>'}</div>`, (el) => {
+    const m = el.querySelector('#hMore'); if (m) m.onclick = () => { G.hint++; openHints(); };
+    const c = el.querySelector('#hClose'); if (c) c.onclick = closeSheet;
+  });
+}
+function openLevels() {
+  const all = G.save.endingsFound.length > 0;
+  const row = (n) => {
+    const L = levelData(n); const lock = !all && n > G.save.reached;
+    return `<button data-n="${n}" ${lock ? 'disabled' : ''} class="${n === G.n ? 'cur' : ''}"><span class="num">${n}</span>${lock ? 'Locked' : esc(L.name)}${G.save.cleared.includes(n) ? '<span class="done">\u2713</span>' : ''}</button>`;
+  };
+  openSheet(`<h2>Levels</h2><div class="lv"><div class="act">Act I \u00b7 Home</div>${[1, 2, 3, 4].map(row).join('')}<div class="act">Act II \u00b7 Neighbours</div>${[5, 6, 7].map(row).join('')}<div class="act">Act III</div>${row(8)}</div>
+    ${G.save.endingsFound.length ? `<p class="found" style="margin-top:12px">Endings found: ${G.save.endingsFound.length} of 3</p>` : ''}`, (el) => {
+    el.querySelectorAll('button[data-n]').forEach((b) => { b.onclick = () => { closeSheet(); startLevel(+b.dataset.n); }; });
+  });
+}
+function openLog() {
+  openSheet(`<h2>Home log</h2><div class="loglist">${G.logs.map((l) => `<div><span class="y">YR ${l.y}</span>${esc(l.text)}</div>`).join('') || '<div>Nothing yet.</div>'}</div>`, (el) => { el.scrollTop = el.scrollHeight; });
+}
+function openCodex() {
+  openSheet(`<h2>Codex</h2><div class="codex">${Object.entries(CODEX).map(([k, c]) => has(k) ? `<div><b>${esc(c.t)}</b>${esc(c.b)}</div>` : '<div class="locked">\u00b7 \u00b7 \u00b7 not yet discovered</div>').join('')}</div>`);
+}
+function openScale() {
+  unlockCodex('dilation');
+  openSheet(`<h2><span class="k">How light works here</span>Scale</h2>${TEXT.scale.map((t) => `<p>${esc(t)}</p>`).join('')}
+  <p class="tagline">Orders: tap a drone, then tap a hex to move it there.${G.n >= 3 && G.n <= 4 ? ' FLASH makes it signal the moment the order arrives.' : ''}${actOf(G.n) === 2 ? ' ASK sends a request addressed to one watcher. Tap Home to ask from Home.' : ''}</p>
+  ${canBeat() ? '<div class="btnrow"><button id="sBeat">Watch an order travel</button></div>' : ''}`, (el) => {
+    const b = el.querySelector('#sBeat'); if (b) b.onclick = () => { closeSheet(); replayBeat(); };
+  });
+}
+function openObjective() {
+  const L = G.L;
+  let extra = '';
+  if (L.receivers) extra += L.receivers.map((r) => `<p class="rule">Relay ${esc(r.id)} wakes if ${r.need} open signals reach it in the same year.</p>`).join('');
+  if (actOf(G.n) === 2) extra += '<p class="rule">Precedents sign only if the first request they hear is addressed to them. Ties are not first.</p>';
+  if (G.n === 8) extra = '<p>Petition 1. Opened before this world had oxygen. Requires: the consent of its inhabitants.</p>';
+  openSheet(`<h2><span class="k">Objective</span>${esc($('objtext').textContent)}</h2>${extra}
+    <p>You win when the light from your success reaches Home, not when it happens.</p>
+    <div class="btnrow"><button id="oScale">How light works here</button><button id="oHint">Hint</button></div>`, (el) => {
+    el.querySelector('#oScale').onclick = openScale; el.querySelector('#oHint').onclick = openHints;
+  });
+}
+$('menuBtn').onclick = openMenu;
+$('lvlname').onclick = () => { AU.init(); openLevels(); };
+$('obj').onclick = () => { AU.init(); openObjective(); };
+$('log').onclick = () => { AU.init(); openLog(); };
+$('primary').onclick = () => {
+  AU.init(); stopFF();
+  if (G.locked || G.won) return;
+  if (G.n === 8 && G.finIntro < 3) { finIntroNext(); return; }
+  if (G.tut === 0 || G.tut === 1) { toast(G.tut === 0 ? 'Tap your drone first.' : 'Tap the derelict first.'); return; }
+  advance();
+};
+$('ff').onclick = untilNews;
+document.addEventListener('pointerdown', () => AU.init(), { once: true });
+document.addEventListener('keydown', (e) => {
+  if (!$('overlay').classList.contains('hidden') || !$('sheet').classList.contains('hidden')) { if (e.key === 'Escape') closeSheet(); return; }
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); $('primary').click(); }
+  else if (e.key === 'Escape') deselect();
+  else if (e.key === 'Backspace' || e.key === 'z') rewindTo(G.now - 1);
+});
+
+// ---------- overlay screens ----------
+const ov = $('overlay');
+function showOverlay(html, opts = {}) {
+  ov.innerHTML = html; ov.classList.remove('hidden'); ov.classList.toggle('tapcard', !!opts.tap);
+  ov.onclick = opts.tap ? (e) => { if (e.target.closest('button,input')) return; AU.init(); opts.tap(); } : null;
+}
+function hideOverlay() { ov.classList.add('hidden'); ov.innerHTML = ''; ov.onclick = null; stopReplay(); waveCtl = null; interCtl = null; AU.stopWind(); layout(); }
+
+// progressive line cards: one card per tap
+function cards(list, done, render) {
+  let i = 0;
+  const show = () => {
+    if (i >= list.length) { done(); return; }
+    const item = list[i];
+    showOverlay(`<div class="card">${render ? render(item, i) : `<div class="line">${esc(item)}</div>`}</div><div class="tapmore">tap</div>`, { tap: () => { i++; show(); } });
+  };
+  show();
+}
+// progressive lines: each tap adds a line on the same card
+function stack(head, lines, done, cls = 'line') {
+  let i = 1;
+  const clsOf = typeof cls === 'function' ? cls : () => cls;
+  const show = () => {
+    // only the newest line fades in; earlier ones stay put
+    showOverlay(`<div class="card${i > 1 ? ' still' : ''}">${head || ''}${lines.slice(0, i).map((l, k) => `<div class="${clsOf(k)}${k < i - 1 ? ' prev' : ''}">${esc(l)}</div>`).join('')}</div><div class="tapmore">tap</div>`, {
+      tap: () => { if (i < lines.length) { i++; show(); } else done(); },
+    });
+  };
+  show();
+}
+
+function showTitle() {
+  const cont = G.save.reached > 1;
+  showOverlay(`<div class="card"><div class="titlewrap"><div class="halo"></div><div class="halo b"></div><div class="title">LIGHT LAG</div></div>
+    <div class="sub">Everything you can see has already happened.</div>
+    <div style="height:14px"></div>
+    <button class="bigbtn" id="tPlay">${cont ? `CONTINUE \u00b7 LEVEL ${Math.min(8, G.save.reached)}` : 'BEGIN'}</button>
+    ${cont ? '<button class="ghostbtn" id="tLevels">Level select</button>' : ''}
+    ${G.save.endingsFound.length ? `<div class="found">Endings found: ${G.save.endingsFound.length} of 3</div>` : ''}
+    <div class="caption" style="margin-top:6px">Headphones help. About 30 minutes.</div></div>`);
+  $('tPlay').onclick = () => { AU.init(); startLevel(Math.min(8, G.save.reached)); };
+  const lv = $('tLevels'); if (lv) lv.onclick = () => { AU.init(); hideOverlay(); loadLevel(Math.min(8, G.save.reached)); openLevels(); };
+}
+function showOpening() {
+  cards(TEXT.opening, () => { G.save.seenOpening = true; persist(); showTitle(); });
+}
+function startLevel(n) {
+  stopHold();
+  loadLevel(n);
+  const sc = SCRIPT[n];
+  if (n === 1) { hideOverlay(); return; }
+  const head = `<div class="kicker">${n === 8 ? 'Act III' : `Level ${n} \u00b7 Act ${actOf(n) === 1 ? 'I' : 'II'}`}</div><div class="ttl2">${esc(levelData(n).name)}</div>`;
+  const lines = n === 8 ? [] : (sc.intro || []);
+  if (!lines.length) { showOverlay(`<div class="card">${head}</div><div class="tapmore">tap to begin</div>`, { tap: () => { hideOverlay(); } }); return; }
+  stack(head, lines, () => hideOverlay(), 'sub');
+}
+
+// ---------- win + truth replay ----------
+let replayCtl = null;
+function stopReplay() { replayCtl = null; }
+function startReplay(host, opts) {
+  const cv = host.querySelector('canvas'), c2 = cv.getContext('2d');
+  const slider = host.querySelector('input'), ylab = host.querySelector('.y'), rl = host.querySelector('.rlabel'), rm = host.querySelector('.rmode');
+  const segs = host.querySelectorAll('.seg button');
+  const R = opts.level.R;
+  let mode = 'true', v = 0, playing = true, t0 = performance.now(), g = null;
+  const end = opts.end, dur = Math.max(6000, Math.min(10000, end * 520));
+  const unlock = {}; for (const d of opts.level.derelicts || []) unlock[d.id] = SIM.firstSeenMove(opts.level, d.id);
+  const exitSeen = {}, exitTrue = {};
+  for (const e of opts.res.events) if (e.type === 'exit') { exitTrue[e.data] = e.t; exitSeen[e.data] = SIM.seenTick(e); }
+  // the replay board takes whatever height the rest of the screen leaves
+  function resize() {
+    const maxW = Math.min(host.clientWidth || 340, 420);
+    let side = maxW;
+    if (opts.fit) {
+      cv.style.width = '0px'; cv.style.height = '0px';
+      const cs = getComputedStyle(ov), padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      side = Math.min(maxW, ov.clientHeight - padV - opts.fit.scrollHeight - 2);
+    }
+    side = Math.max(150, Math.floor(side));
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    cv.style.width = side + 'px'; cv.style.height = side + 'px'; cv.width = side * dpr; cv.height = side * dpr;
+    c2.setTransform(dpr, 0, 0, dpr, 0, 0); g = makeGeom(side, side, R);
+  }
+  resize();
+  slider.max = end; slider.step = 0.01;
+  slider.oninput = () => { playing = false; v = +slider.value; };
+  segs.forEach((b) => { b.onclick = () => { mode = b.dataset.m; segs.forEach((x) => x.classList.toggle('on', x === b)); }; });
+  segs.forEach((x) => x.classList.toggle('on', x.dataset.m === mode));
+  const again = host.querySelector('.rbtn');
+  if (again) again.onclick = () => ctl.replay();
+  const ctl = {
+    resize,
+    replay() { v = 0; playing = true; t0 = performance.now(); },
+    tick(t) {
+      if (playing) {
+        v = Math.max(0, Math.min(end, (t - t0) / dur * end));
+        if (reduced()) v = Math.floor(v); // whole years only: no sliding
+        if (v >= end) playing = false;
+        slider.value = v;
+      }
+      const now = Math.max(0, Math.ceil(v - 1e-9)), p = now === 0 ? 1 : v - now + 1;
+      render(c2, g, { level: opts.level, res: opts.res, now, p, mode, unlock, exitSeen, exitTrue, showHidden: opts.showHidden, fin: opts.fin, clock: t, stars: STARS, newsEvents: opts.news, noLabels: true, reduced: reduced(), confirm: opts.confirm || null, ui: { tags: [], moveLines: [], highlight: [] } });
+      ylab.textContent = `year ${Math.floor(v)}`;
+      rm.textContent = mode === 'true' ? 'As it was' : 'As seen';
+      rl.textContent = mode === 'true' ? 'What was really happening.' : 'What Home could see at the time.';
+    },
+  };
+  replayCtl = ctl;
+  return ctl;
+}
+function replayHTML() {
+  return `<div class="replay"><div class="rbox"><canvas></canvas><div class="rtag"><span class="rmode"></span><span class="y"></span></div></div>
+    <div class="rctl"><div class="seg"><button data-m="seen">AS SEEN</button><button data-m="true">AS IT WAS</button></div><button class="rbtn" aria-label="Play the replay again">\u21BA</button></div>
+    <div class="scrub"><input type="range" min="0" value="0" aria-label="Scrub years"></div><div class="rlabel"></div></div>`;
+}
+function showWin() {
+  const o = G.out, sc = SCRIPT[G.n];
+  let end = sc.end;
+  if (G.n === 1) end = `Confirmed. It happened ${WORDS[o.lag] || o.lag} year${o.lag === 1 ? '' : 's'} ago. You found out just now. This will keep happening.`;
+  showOverlay(`<div class="win"><div class="kicker">Level ${G.n} \u00b7 ${esc(G.L.name)}</div><div class="conf">Confirmed</div>
+    <div class="when">It happened in year <b>${o.happened_at}</b>.<br>You found out in year <b>${o.confirmed_at_home}</b>.</div>
+    <div class="end">${esc(end)}</div>${replayHTML()}
+    <div class="btnrow"><button id="wAgain">Play again</button><button class="go" id="wNext">${G.n === 7 ? 'Onward \u25B8' : 'Next \u25B8'}</button></div></div>`);
+  const confirm = { at: o.confirmed_at_home, pts: o.req.filter((e) => SIM.seenTick(e) === o.confirmed_at_home).map((e) => e.pos) };
+  startReplay(ov.querySelector('.replay'), { level: G.L, res: G.res, end: o.confirmed_at_home, news: o.req, confirm, fit: ov.querySelector('.win'), showHidden: G.save.reached >= 5 && G.n >= 5 || G.save.reached >= 6 });
+  $('wAgain').onclick = () => { hideOverlay(); loadLevel(G.n); };
+  $('wNext').onclick = nextAfterWin;
+}
+// act cards: the first line is the act's title
+const actCard = (lines, done) => stack('', lines, done, (k) => (k === 0 ? 'ttl2' : 'line'));
+function nextAfterWin() {
+  const n = G.n, sc = SCRIPT[n];
+  stopReplay();
+  if (n === 4) actCard(sc.actCard, () => showInterstitial(() => startLevel(5)));
+  else if (n === 7) actCard(sc.actCard, () => startLevel(8));
+  else startLevel(n + 1);
+}
+
+// ---------- interstitial: reclassifying ----------
+let interCtl = null;
+function showInterstitial(done) {
+  unlockCodex('noise');
+  G.save.reached = Math.max(G.save.reached, 5); persist();
+  let i = 0;
+  const boards = [2, 3, 4].map((n) => {
+    const L = LEVELS_JSON[n - 1];
+    const ref = Object.entries(L.test_plans).find(([k]) => k.startsWith('reference'))[1];
+    const plan = ref.map((x) => ({ t: x[0], kind: x[1], who: x[2], arg: x[3] }));
+    const res = SIM.simulate(L, plan, 30);
+    // each filed glint resolves into the watcher that made it
+    const reveal = {};
+    for (const e of res.events) if (e.type === 'glint' && reveal[e.data] === undefined) reveal[e.data] = e.t;
+    return { L, res, reveal };
+  });
+  const SPAN = 3.6, YEARS = 16;
+  const t0 = performance.now(); // one clock for the whole sequence, so taps don't restart the boards
+  const show = () => {
+    const last = i >= TEXT.interstitial.length;
+    showOverlay(`<div class="card inter"><canvas id="icv"></canvas><div class="itext">${last ? '<div class="kicker">Act II</div><div class="ttl2">Neighbours</div>' : `<div class="line">${esc(TEXT.interstitial[i])}</div>`}</div></div><div class="tapmore">tap</div>`, {
+      tap: () => { if (last) { interCtl = null; done(); } else { i++; show(); } },
+    });
+    const cv = $('icv'), c2 = cv.getContext('2d');
+    const side = Math.floor(Math.min(320, innerWidth - 48, innerHeight * 0.42));
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    cv.style.width = side + 'px'; cv.style.height = side + 'px'; cv.width = side * dpr; cv.height = side * dpr; c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const g = makeGeom(side, side, 4);
+    interCtl = (t) => {
+      const el = Math.max(0, t - t0) / 1000, bi = Math.floor(el / SPAN) % 3, b = boards[bi];
+      let v = (el % SPAN) / SPAN * YEARS;
+      if (reduced()) v = Math.floor(v);
+      const now = Math.max(0, Math.ceil(v)), p = now === 0 ? 1 : v - now + 1;
+      render(c2, g, { level: b.L, res: b.res, now, p, mode: 'true', unlock: {}, exitSeen: {}, exitTrue: {}, showHidden: true, reveal: b.reveal, clock: t, stars: STARS, noLabels: true, reduced: reduced(), ui: { tags: [], moveLines: [], highlight: [] } });
+    };
+  };
+  show();
+}
+
+// ---------- finale ----------
+function finIntroShow() {
+  const i = G.finIntro;
+  if (i < 3) setCoach(TEXT.finaleOpen[i], { tap: finIntroNext });
+}
+function finIntroNext() {
+  addLog(TEXT.finaleOpen[G.finIntro]);
+  G.finIntro++;
+  if (G.finIntro < 3) finIntroShow(); else clearCoach();
+  updateUI();
+}
+function finaleYear(n) {
+  const f = G.fin, sent = f.sentYear !== null;
+  let news = false;
+  const say = (t, coach) => { addLog(t); news = true; if (coach) setCoach(t, { dismiss: true }); };
+  if (n === 6) say('It has started leaking radio. Not to us. To everyone.');
+  if (f.calls.map((c) => c + FIN.WR).includes(n)) {
+    AU.call();
+    if (n === 10) { say('A pulse train: 2, 3, 5, 7. Primes. Decoded: IS ANYONE THERE?'); say('That one was aimed.', true); }
+    else say('The call again. IS ANYONE THERE?');
+  }
+  if (FIN.NOTYET.map((c) => c + FIN.WR).includes(n)) {
+    AU.notyet();
+    if (n === 13) { say('A second voice, fainter. Amber. NOT YET.'); say('Not all of them.'); say('You could answer. You could wait. Or you could give the question to someone closer.', true); unlockCodex('stale'); }
+    else say('The amber voice. NOT YET.');
+  }
+  if (n === 19 && !sent) say('Waiting is the only choice that can be undone. It is still a choice.', true);
+  if (n === 26 && !f.calls.map((c) => c + FIN.WR).includes(26) && f.sentYear === null) say('No call this year.');
+  if (f.probe && n === FIN.PROBE_LAUNCH + FIN.WR) say('Something has left their world. It is coming this way. It appears to hurry. It is not hurrying.', !G.locked);
+  if (sent && f.kind === 'answer' && f.A !== null && n > f.sentYear && n <= f.A) say(n < f.A ? `Your answer is ${n - f.sentYear} light-year${n - f.sentYear === 1 ? '' : 's'} out.` : 'Your answer has reached them. Now the light has to come back.');
+  if (f.endSeen !== null && n === f.endSeen) finaleEnding(f.kind);
+  if (n === FIN.HOLD_AT && !sent && !G.queue.length) startHold();
+  return news;
+}
+let holdT = null;
+function startHold() {
+  G.locked = true; G.sel = null; clearCoach(); updateUI();
+  addLog('Holding.');
+  const step = () => {
+    if (G.now >= FIN.HOLD_END) { holdT = null; finaleEnding('hold'); return; }
+    advance();
+    holdT = setTimeout(step, 700);
+  };
+  holdT = setTimeout(step, 900);
+}
+function stopHold() { if (holdT) { clearTimeout(holdT); holdT = null; } }
+function finaleEnding(kind) {
+  if (G.won) return;
+  G.won = true; G.locked = true; stopFF(); stopHold(); updateUI();
+  const k = kind === 'delegate' ? 'delegate' : kind === 'answer' ? 'answer' : 'hold';
+  if (!G.save.endingsFound.includes(k)) G.save.endingsFound.push(k);
+  if (!G.save.cleared.includes(8)) G.save.cleared.push(8);
+  G.save.reached = 9; persist();
+  if (k !== 'hold') { AU.chord(); setCoach(k === 'answer' ? 'Something is coming back.' : 'V is writing.'); }
+  const token = G.levelToken;
+  setTimeout(() => { if (G.levelToken === token) showEnding(k); }, reduced() ? 600 : 2200);
+}
+let waveCtl = null;
+function showEnding(k) {
+  const f = G.fin, E = ENDINGS[k];
+  const stampCls = k === 'answer' ? '' : k === 'delegate' ? 'gold' : 'blue';
+  const doc = `<div class="stampwrap"><div class="doc">PETITION 1<br>Opened: before oxygen<br>Requires: consent of its inhabitants<br>Year: ${G.now}<br>Status:</div><div class="stamp ${stampCls}">${esc(E.stamp)}</div></div>`;
+  const steps = [];
+  steps.push(() => { showOverlay(`<div class="card"><div class="kicker">Ending \u00b7 ${esc(E.name)}</div>${doc}</div><div class="tapmore">tap</div>`, { tap: next }); setTimeout(() => AU.stamp(), reduced() ? 0 : 900); });
+  const lines = (arr, cls) => steps.push(() => stack(`<div class="kicker">${esc(E.name)}</div>`, arr, next, cls || 'line'));
+  if (k === 'answer') {
+    lines(['You answered a question that was ten years old by the time your reply arrived.',
+      f.sentYear < 13 ? "Some of them had already begun saying not yet. You hadn't seen it." : 'Some of them are still saying not yet. That is in the record too.']);
+    steps.push(() => forest(['Light could show you their forests. It could never give you one.'].concat(f.probe ? ['They had already sent an instrument of their own toward you. It will arrive to find the door open.'] : []), next));
+  } else if (k === 'delegate') {
+    lines(["You couldn't ask them without answering them, so you gave the question to someone close enough to hear the answer still being given."]);
+    steps.push(() => showOverlay(`<div class="card"><div class="kicker">Forwarded by V</div><div class="stampwrap"><div class="doc letter">I listened until I was sure they were still asking. I answered with terms either side may withdraw from. The ones who said not yet are recorded. No participant warrants the absence of unknown harm.<span class="sig">\u2014 V</span></div></div></div><div class="tapmore">tap</div>`, { tap: next }));
+    steps.push(() => forest(["V doesn't take your orders any more. It writes sometimes. Late, of course."], next));
+  } else {
+    lines(['You did not answer. Their call went on for a while, and then it stopped.',
+      'They have built an instrument. It is coming this way, slowly, to watch. It will not say anything. They learned that from you.',
+      'From inside every world like theirs, the galaxy looks empty.']);
+  }
+  steps.push(() => {
+    showOverlay(`<div class="win"><div class="kicker">Ending \u00B7 ${esc(E.name)}</div><div class="conf plain">What really happened</div><div class="end">Their world, as it was. Your choice, as it travelled.</div>${replayHTML()}<div class="btnrow"><button class="go" id="eNext">Continue \u25B8</button></div></div>`);
+    const news = f.forward ? [{ t: f.forward.t, pos: f.forward.pos }] : [];
+    const confirm = f.endSeen !== null ? { at: f.endSeen, pts: [f.forward ? f.forward.pos : FIN.W] } : null;
+    startReplay(ov.querySelector('.replay'), { level: G.L, res: G.res, end: Math.max(G.now, 12), news, fin: f, confirm, showHidden: true, fit: ov.querySelector('.win') });
+    $('eNext').onclick = next;
+  });
+  steps.push(credits);
+  let i = 0;
+  function next() { stopReplay(); waveCtl = null; AU.stopWind(); const s = steps[i++]; if (s) s(); }
+  next();
+}
+function forest(after, done) {
+  const w = AU.startWind();
+  showOverlay(`<div class="card"><div class="kicker">The reply</div><canvas class="wave" id="wv"></canvas><div class="caption">${esc(TEXT.forestCaption)}</div>${AU.on ? '' : '<div class="caption">(sound is off: shown as a waveform)</div>'}<div id="fAfter"></div></div><div class="tapmore">tap</div>`, {
+    tap: () => {
+      const el = $('fAfter');
+      if (el.children.length < after.length) { const d = document.createElement('div'); d.className = 'line'; d.textContent = after[el.children.length]; el.appendChild(d); }
+      else { AU.stopWind(); done(); }
+    },
+  });
+  const cv = $('wv'), c2 = cv.getContext('2d');
+  const W = Math.min(360, innerWidth - 48), H = 80, dpr = Math.min(3, window.devicePixelRatio || 1);
+  cv.style.width = W + 'px'; cv.style.height = H + 'px'; cv.width = W * dpr; cv.height = H * dpr; c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const buf = new Uint8Array(1024);
+  waveCtl = (t) => {
+    c2.clearRect(0, 0, W, H);
+    c2.strokeStyle = 'rgba(170,240,200,0.85)'; c2.lineWidth = 1.5; c2.beginPath();
+    const an = AU.analyser;
+    let live = false;
+    if (an) {
+      an.getByteTimeDomainData(buf);
+      // a blocked or silent output still gets the drawn forest
+      let peak = 0; for (let i = 0; i < buf.length; i += 8) peak = Math.max(peak, Math.abs(buf[i] - 128));
+      live = peak > 2;
+    }
+    if (live) { for (let x = 0; x < W; x++) { const v = (buf[Math.floor(x / W * buf.length)] - 128) / 128; const y = H / 2 + v * H * 1.6; x ? c2.lineTo(x, y) : c2.moveTo(x, y); } }
+    else {
+      if (reduced()) t = 5200; // a still image of the same sound
+      const env = 0.55 + 0.45 * Math.sin(t / 1900);
+      for (let x = 0; x < W; x++) { const y = H / 2 + env * (Math.sin(x / 9 + t / 260) * 9 + Math.sin(x / 3.1 + t / 90) * 4 + Math.sin(x / 23 - t / 700) * 8) + (reduced() ? 0 : (Math.random() - 0.5) * 3 * env) + (Math.sin(t / 333) > 0.97 ? Math.sin(x / 1.2) * 10 * Math.exp(-Math.abs(x - W * 0.7) / 20) : 0); x ? c2.lineTo(x, y) : c2.moveTo(x, y); }
+    }
+    c2.shadowColor = 'rgba(170,240,200,0.6)'; c2.shadowBlur = 8;
+    c2.stroke(); c2.shadowBlur = 0;
+  };
+  void w;
+}
+function credits() {
+  const found = G.save.endingsFound.length;
+  showOverlay(`<div class="card credits"><div class="title">LIGHT LAG</div>${TEXT.credits.slice(1).map((l) => `<div class="line">${esc(l)}</div>`).join('')}
+    <div class="tail"><div class="found">Endings found: ${found} of 3</div>
+    <button class="bigbtn" id="cPlay">PLAY AGAIN</button></div></div>`);
+  $('cPlay').onclick = () => { hideOverlay(); loadLevel(8); openLevels(); };
+}
+
+// ---------- boot ----------
+document.body.classList.toggle('reduced', G.save.settings.reduced);
+G.L = levelData(1);
+requestAnimationFrame(() => {
+  layout();
+  if (!G.save.seenOpening) showOpening(); else showTitle();
+  loadLevel(Math.min(8, G.save.reached));
+  requestAnimationFrame(loop);
+});
+// test hook (no network, no data collection; used by the automated checks)
+window.__LL = { G, SIM, FIN, advance, rewindTo, loadLevel, startLevel, queueMove, queueFlash, select, onBoardTap, hideOverlay, untilNews, geomOf: () => geom };
+
+</script>
+</body>
+</html>
