@@ -12,7 +12,7 @@ try { store = window.localStorage; store.getItem(SAVE_KEY); } catch (e) { store 
 function loadSave() {
   let s = null;
   try { s = store ? JSON.parse(store.getItem(SAVE_KEY) || 'null') : null; } catch (e) { s = null; }
-  const d = { reached: 1, endingsFound: [], settings: { sound: true, reduced: false }, codex: [], cleared: [], tutorialDone: false, seenOpening: false };
+  const d = { reached: 1, endingsFound: [], settings: { sound: true, reduced: false }, codex: [], cleared: [], tutorialDone: false, seenOpening: false, l0Skipped: false };
   if (!s || typeof s !== 'object') return d;
   return Object.assign(d, s, { settings: Object.assign(d.settings, s.settings || {}) });
 }
@@ -21,14 +21,20 @@ function persist() { try { if (store) store.setItem(SAVE_KEY, JSON.stringify(G.s
 const G = {
   save: loadSave(), n: 1, L: null, plan: [], queue: [], now: 0, p: 1, animT0: 0,
   res: null, out: null, fin: null, unlock: {}, exitSeen: {}, exitTrue: {},
-  sel: null, mode: 'move', logs: [], hint: 0, won: false, flags: {}, glintIdx: 0, tut: -1,
+  sel: null, mode: 'move', logs: [], hint: 0, won: false, flags: {}, glintIdx: 0, tut: -1, guide: -1,
   locked: false, ff: null, finIntro: 3, ui: { tags: [], moveLines: [], highlight: [] }, outInfo: [],
 };
 AU.on = G.save.settings.sound;
 const mqReduce = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
 const reduced = () => G.save.settings.reduced || mqReduce.matches;
 const actOf = (n) => (n <= 4 ? 1 : n <= 7 ? 2 : 3);
-const levelData = (n) => (n === 8 ? FINALE_LEVEL : LEVELS_JSON[n - 1]);
+const levelData = (n) => (n === 8 ? FINALE_LEVEL : LEVELS_JSON.find((l) => l.n === n));
+// where BEGIN / CONTINUE goes: new players start in L0; anyone who has played L1 never has to
+function entryLevel(s) {
+  const veteran = s.tutorialDone || s.reached > 1 || s.cleared.some((n) => n >= 1) || s.endingsFound.length > 0;
+  if (!veteran && !s.cleared.includes(0) && !s.l0Skipped) return 0;
+  return Math.min(8, Math.max(1, s.reached));
+}
 const STARS = Array.from({ length: 70 }, () => [Math.random(), Math.random(), 0.15 + Math.random() * 0.5, Math.random() * 6]);
 
 // ---------- canvas ----------
@@ -78,7 +84,7 @@ function loop(t) {
   // a hairline under the top bar fills while each year passes
   if (G.p < 1) { tickbar.style.transform = `scaleX(${G.p.toFixed(3)})`; if (!tickOn) { tickbar.classList.add('on'); tickOn = true; } }
   else if (tickOn) { tickbar.style.transform = 'scaleX(1)'; tickbar.classList.remove('on'); tickOn = false; }
-  if (G.L && geom && $('overlay').classList.contains('hidden')) { render(ctx, geom, frame()); if (G.beat) drawBeat(ctx, geom, t); }
+  if (G.L && geom && $('overlay').classList.contains('hidden')) { render(ctx, geom, frame()); if (G.beat) drawBeat(ctx, geom, t); if (G.guide >= 0) drawGuide(ctx, geom, t); }
   if (replayCtl) replayCtl.tick(t);
   if (waveCtl) waveCtl(t);
   if (interCtl) interCtl(t);
@@ -101,10 +107,12 @@ function loadLevel(n) {
   G.unlock = {};
   for (const d of G.L.derelicts || []) G.unlock[d.id] = SIM.firstSeenMove(G.L, d.id);
   G.tut = n === 1 && !G.save.tutorialDone ? 0 : -1;
+  G.guide = n === 0 && !G.noGuide ? GD.OUT : -1;
   G.finIntro = n === 8 ? 0 : 3;
   resim(); layout(); clearCoach();
   for (const l of SCRIPT[n].startLog || []) addLog(l);
   if (G.tut === 0) setCoach('Tap your drone.');
+  if (G.guide === GD.OUT) guideTo(GD.OUT);
   if (n === 8) finIntroShow();
   updateUI();
 }
@@ -123,6 +131,7 @@ function advance() {
   G.p = reduced() ? 1 : 0; G.animT0 = performance.now();
   const news = processYear(G.now);
   tutorialAfterAdvance(sent);
+  guideAfterAdvance();
   updateUI();
   return news;
 }
@@ -224,7 +233,7 @@ function onWin() {
 }
 
 function rewindTo(y) {
-  if (G.locked) return;
+  if (G.locked || G.guide >= 0) return;
   y = Math.max(0, Math.min(y, G.now));
   finishAnim(); stopFF();
   G.plan = G.plan.filter((o) => o.t < y); G.queue = []; G.now = y; G.won = false; G.sel = null; G.mode = 'move'; G.beat = null;
@@ -250,7 +259,9 @@ function tutTap(hex) {
     if (hex && sp && SIM.eq(hex, sp[1])) {
       queueMove('A', hex); G.tut = 2;
       // before the first TRANSMIT, show the two delays apart on this very order
-      startBeat('A', hex, () => setCoach('TRANSMIT. Your order travels at the speed of light.'));
+      // (players who cleared L0 have already lived through them)
+      const go = () => setCoach('TRANSMIT. Your order travels at the speed of light.');
+      if (G.save.cleared.includes(0)) go(); else startBeat('A', hex, go);
     } else toast('Tap the derelict at the top.');
   } else if (G.tut === 2) toast('Tap TRANSMIT.');
   else if (G.tut === 3) toast('Tap WAIT.');
@@ -367,6 +378,97 @@ function replayBeat() {
   startBeat('A', target, () => {});
 }
 
+// ---------- L0 "First Light": the guided run ----------
+// One fixed run (MOVE A to the mark at year 0), told a line a year. Kept apart
+// from L1's G.tut so that coach doesn't change. The copy lives in L0 (data.js).
+const GD = { OUT: 0, IN: 1, AIM: 2, MARK: 3, ASK1: 4, TX: 5, WAIT: 6, Y6: 7, ASK2: 8, WAIT2: 9, END: 10 };
+const GD_NEXT = { [GD.OUT]: GD.IN, [GD.IN]: GD.AIM, [GD.Y6]: GD.ASK2 }; // steps that a tap moves along
+const guideAsk = () => (G.guide === GD.ASK1 ? L0.ask1 : G.guide === GD.ASK2 ? L0.ask2 : null);
+function guideCoach(line, opts = {}) {
+  setCoach(line[1], Object.assign({ lead: line[0] || '' }, opts));
+  addLog(line[0] ? line[0] + ' ' + line[1] : line[1]);
+  guideAvoid();
+}
+// the card must never cover Home, A (either image), the hex A passes through or the mark
+function guideAvoid() {
+  const h = G.res.hist['drone:A'], sp = SIM.seenPos(h, G.now);
+  coachAvoid([SIM.HOME, h[G.now], sp && sp[1], [2, -2], G.L.objective.cell]);
+}
+function guideTo(step) {
+  G.guide = step; G.guideT0 = performance.now();
+  const ask = guideAsk(), tap = GD_NEXT[step] !== undefined ? { tap: () => guideTo(GD_NEXT[step]) } : {};
+  if (ask) guideCoach([null, ask.q]);
+  else if (step === GD.Y6) guideCoach(L0.years[6], tap);
+  else guideCoach([L0.g1, L0.g2, L0.g3, L0.g4][step], tap);
+  updateUI();
+}
+function guideAnswer(y) {
+  const ask = guideAsk();
+  if (!ask) return;
+  AU.step();
+  G.guide = G.guide === GD.ASK1 ? GD.TX : GD.WAIT2;
+  guideCoach([null, y === ask.right ? ask.yes : ask.no]);
+  updateUI();
+}
+function guideAfterAdvance() {
+  if (G.guide < 0 || G.guide === GD.END) return;
+  if (G.won) { G.guide = GD.END; guideAvoid(); return; } // onWin has the last word
+  if (G.guide === GD.TX) G.guide = GD.WAIT;
+  if (G.now === 6 && G.guide === GD.WAIT) { guideTo(GD.Y6); return; }
+  if (L0.years[G.now]) guideCoach(L0.years[G.now]);
+}
+function guideTap(hex) {
+  const s = G.guide;
+  if (GD_NEXT[s] !== undefined) guideTo(GD_NEXT[s]);
+  else if (s === GD.AIM) {
+    if (hex && droneAtHex(hex) === 'A') { select('A'); guideTo(GD.MARK); } else toast(L0.toast.aim);
+  } else if (s === GD.MARK) {
+    // the mark is the only target the guide accepts
+    if (hex && SIM.eq(hex, G.L.objective.cell)) { queueMove('A', hex); G.sel = null; guideTo(GD.ASK1); } else toast(L0.toast.mark);
+  } else if (s !== GD.END) toast(guideAsk() ? L0.toast.pick : s === GD.TX ? L0.toast.tx : L0.toast.wait);
+}
+// may the primary button go ahead? (prediction steps disable it outright)
+function guidePrimary() {
+  const s = G.guide;
+  if (s === GD.TX || s === GD.WAIT || s === GD.WAIT2 || s === GD.END) return true;
+  toast(s === GD.AIM ? L0.toast.aim : s === GD.MARK ? L0.toast.mark : GD_NEXT[s] !== undefined ? L0.toast.card : L0.toast.pick);
+  return false;
+}
+// G1/G2 illustrations, drawn over the board like the beat: light going out
+// from Home a ring at a time, then light from A coming in. Not sim pulses.
+const RIPPLE_RING = 800, RIPPLE_HOLD = 800;
+function drawGuide(c, g, t) {
+  const st = G.guide;
+  if (st !== GD.OUT && st !== GD.IN) return;
+  const out = st === GD.OUT, src = out ? SIM.HOME : G.L.drones.A, d = out ? G.L.R : SIM.ring(src);
+  const run = d * RIPPLE_RING, el = Math.max(0, t - G.guideT0) % (run + RIPPLE_HOLD);
+  const r = reduced() ? d : Math.min(d, el / RIPPLE_RING);
+  const fade = reduced() || el <= run ? 1 : 1 - (el - run) / RIPPLE_HOLD;
+  const s = g.size, fs = Math.round(Math.max(10, Math.min(12, s * 0.46)));
+  c.save();
+  frontPath(c, g, SIM.HOME, g.R + 0.62); c.clip();
+  newsFront(c, g, src, Math.max(0.05, r), fade);
+  c.restore();
+  c.save();
+  if (out) {
+    // each ring's age label lights up as the front crosses it
+    const sp = ringSpoke({ level: G.L, res: G.res }), lf = Math.round(Math.max(10, Math.min(11.5, s * 0.44)));
+    c.font = `600 ${lf}px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    for (let k = 1; k <= g.R; k++) {
+      const lit = clamp01((r - k + 0.35) / 0.35) * fade;
+      if (lit <= 0) continue;
+      const [x, y] = g.px(sp[0] * k, sp[1] * k);
+      c.globalAlpha = lit; haloText(c, k === 1 ? '1 yr ago' : `${k} yrs`, x, y + s * 0.56, COL.home, 'rgba(5,10,23,0.9)', 3);
+    }
+  } else {
+    const [x, y] = g.px(src[0], src[1]);
+    c.font = `600 ${fs}px ${FONT}`;
+    const w = Math.ceil(c.measureText(L0.ago).width) + 12, hh = fs + 7;
+    drawPill(c, { x: Math.round(x - w / 2), y: Math.round(y - s * 1.05 - hh / 2), w, h: hh }, { text: L0.ago, color: COL.home, alpha: 1, fs });
+  }
+  c.restore();
+}
+
 // ---------- selection & orders ----------
 function dronePosCalc(id) {
   if (G.fin && G.fin.standingAt !== null && G.now >= G.fin.standingAt) return null;
@@ -386,7 +488,7 @@ function select(id) {
   if (G.tut === 4 || G.tut < 0) clearCoachIfDismiss();
   AU.step(); updateUI();
 }
-function deselect() { G.sel = null; G.mode = 'move'; updateUI(); }
+function deselect() { G.sel = null; G.mode = 'move'; if (G.guide === GD.MARK) { guideTo(GD.AIM); return; } updateUI(); }
 function queueMove(id, hex) {
   G.queue = G.queue.filter((o) => !(o.kind === 'MOVE' && o.who === id));
   G.queue.push({ kind: 'MOVE', who: id, arg: hex });
@@ -411,6 +513,7 @@ function onBoardTap(x, y) {
   const hex = geom.hexAt(x, y);
   if (G.n === 8 && G.finIntro < 3) { finIntroNext(); return; }
   if (G.won) return;
+  if (G.guide >= 0) { guideTap(hex); return; }
   if (G.tut >= 0 && G.tut < 4) { tutTap(hex); return; }
   if (!hex) { deselect(); return; }
   const droneId = droneAtHex(hex);
@@ -536,6 +639,8 @@ function updateUI() {
   const hl = [];
   if (G.tut === 0) { const c = dronePosCalc('A'); if (c) hl.push(c); }
   if (G.tut === 1) { const sp = SIM.seenPos(G.res.hist['der:D1'], G.now); if (sp) hl.push(sp[1]); }
+  if (G.guide === GD.AIM) { const c = dronePosCalc('A'); if (c) hl.push(c); }
+  if (G.guide === GD.MARK) hl.push(G.L.objective.cell);
   G.ui = { tags: ct.tags, moveLines: ct.lines, highlight: hl };
   // outbox
   const ob = $('outbox');
@@ -546,7 +651,7 @@ function updateUI() {
     b.className = 'chip out' + (had.has(k) ? ' old' : ''); b.dataset.k = k;
     const what = o.kind === 'MOVE' ? 'move' : o.kind === 'STANDING' ? 'standing' : o.kind === 'PING' ? (o.arg === 'W' ? 'answer W' : `ask ${nm(o.arg)}`) : o.arg ? (o.arg === 'W' ? 'answer W' : `ask ${nm(o.arg)}`) : 'flash';
     b.innerHTML = `<span class="who">${o.who === 'HOME' ? 'Home' : esc(o.who)}</span> \u2192 ${esc(what)}${ct.info[i] ? ` <span class="eta">\u00b7 ${esc(ct.info[i])}</span>` : ''}`;
-    if (G.tut !== 2) {
+    if (G.tut !== 2 && G.guide < 0) {
       const x = document.createElement('button'); x.className = 'x'; x.setAttribute('aria-label', 'Remove order'); x.textContent = '\u2715';
       x.onclick = (ev) => { ev.stopPropagation(); G.queue.splice(i, 1); updateUI(); };
       b.appendChild(x);
@@ -562,7 +667,9 @@ function updateUI() {
   const fin = G.fin, callSeen = G.n === 8 && G.now >= 10;
   const decisiveQueued = G.queue.some((o) => (o.arg === 'W') || o.kind === 'STANDING');
   const decisiveSent = fin && fin.sentYear !== null;
-  if (G.sel && G.sel !== 'HOME' && !G.won && !G.locked) {
+  const ask = guideAsk();
+  if (ask) for (const y of ask.opts) chip(`Year ${y}`, '', () => guideAnswer(y));
+  else if (G.sel && G.sel !== 'HOME' && !G.won && !G.locked) {
     const id = G.sel;
     chip('MOVE', G.mode === 'move' ? 'on' : '', () => { G.mode = 'move'; updateUI(); });
     if (G.n >= 3 && G.n <= 4) chip('FLASH', '', () => { if (G.tut >= 0 && G.tut < 4) return; queueFlash(id, null); });
@@ -573,7 +680,7 @@ function updateUI() {
     }
     chip('\u2715', '', deselect, 'Deselect');
     // say what the next tap does, while there is room for it
-    if (ch.children.length <= 3 && !(G.tut >= 0 && G.tut < 4)) {
+    if (ch.children.length <= 3 && !(G.tut >= 0 && G.tut < 4) && G.guide < 0) {
       const aimed = G.queue.some((o) => o.kind === 'MOVE' && o.who === id);
       chipHint(G.mode === 'ask' ? 'Tap a watcher.' : aimed ? 'Tap to re-aim.' : 'Tap a hex to aim.');
     }
@@ -598,11 +705,11 @@ function updateUI() {
   else if (G.n === 8 && callSeen) { lab = 'PENDING \u25B8'; state = 'pend'; }
   if (G.locked) lab = G.n === 8 && !decisiveSent ? 'PENDING' : lab;
   for (const c of ['tx', 'listen', 'pend']) pr.classList.toggle(c, c === state);
-  pr.classList.toggle('pulse', (G.tut === 2 && !G.beat) || G.tut === 3);
-  pr.disabled = !!(G.locked || G.won);
+  pr.classList.toggle('pulse', (G.tut === 2 && !G.beat) || G.tut === 3 || [GD.TX, GD.WAIT, GD.WAIT2].includes(G.guide));
+  pr.disabled = !!(G.locked || G.won || ask || G.guide === GD.Y6);
   setText('primary', lab);
   const ff = $('ff');
-  ff.disabled = G.n === 8 || G.won || G.locked || (G.tut >= 0 && G.tut < 4);
+  ff.disabled = G.n === 8 || G.won || G.locked || (G.tut >= 0 && G.tut < 4) || G.guide >= 0;
   ff.classList.toggle('on', !!G.ff);
   renderLogLine();
 }
@@ -743,9 +850,9 @@ function inspect(hex) {
 function openMenu() {
   AU.init();
   const s = G.save.settings;
-  openSheet(`<h2><span class="k">Level ${G.n} · Year ${G.now}</span>${esc(G.L.name)}</h2><div class="menu">
+  openSheet(`<h2><span class="k">${G.n === 0 ? 'Tutorial' : `Level ${G.n}`} · Year ${G.now}</span>${esc(G.L.name)}</h2><div class="menu">
     <button id="mRestart">Restart level</button>
-    <button id="mRewind" ${G.now === 0 || G.locked ? 'disabled' : ''}>Rewind 1 year <span class="v">to year ${Math.max(0, G.now - 1)}</span></button>
+    <button id="mRewind" ${G.now === 0 || G.locked || G.guide >= 0 ? 'disabled' : ''}>Rewind 1 year <span class="v">to year ${Math.max(0, G.now - 1)}</span></button>
     <button id="mHint">Hint</button>
     <div class="grid">
       <button id="mLevels">Level select</button>
@@ -784,7 +891,7 @@ function openLevels() {
     const L = levelData(n); const lock = !all && n > G.save.reached;
     return `<button data-n="${n}" ${lock ? 'disabled' : ''} class="${n === G.n ? 'cur' : ''}"><span class="num">${n}</span>${lock ? 'Locked' : esc(L.name)}${G.save.cleared.includes(n) ? '<span class="done">\u2713</span>' : ''}</button>`;
   };
-  openSheet(`<h2>Levels</h2><div class="lv"><div class="act">Act I \u00b7 Home</div>${[1, 2, 3, 4].map(row).join('')}<div class="act">Act II \u00b7 Neighbours</div>${[5, 6, 7].map(row).join('')}<div class="act">Act III</div>${row(8)}</div>
+  openSheet(`<h2>Levels</h2><div class="lv"><div class="act">Tutorial</div>${row(0)}<div class="act">Act I \u00b7 Home</div>${[1, 2, 3, 4].map(row).join('')}<div class="act">Act II \u00b7 Neighbours</div>${[5, 6, 7].map(row).join('')}<div class="act">Act III</div>${row(8)}</div>
     ${G.save.endingsFound.length ? `<p class="found" style="margin-top:12px">Endings found: ${G.save.endingsFound.length} of 3</p>` : ''}`, (el) => {
     el.querySelectorAll('button[data-n]').forEach((b) => { b.onclick = () => { closeSheet(); startLevel(+b.dataset.n); }; });
   });
@@ -824,6 +931,7 @@ $('primary').onclick = () => {
   if (G.locked || G.won) return;
   if (G.n === 8 && G.finIntro < 3) { finIntroNext(); return; }
   if (G.tut === 0 || G.tut === 1) { toast(G.tut === 0 ? 'Tap your drone first.' : 'Tap the derelict first.'); return; }
+  if (G.guide >= 0 && !guidePrimary()) return;
   advance();
 };
 $('ff').onclick = untilNews;
@@ -854,29 +962,31 @@ function cards(list, done, render) {
   show();
 }
 // progressive lines: each tap adds a line on the same card
-function stack(head, lines, done, cls = 'line') {
+// opts: foot (the last line's footer), extra (HTML under the lines), mount (after each render)
+function stack(head, lines, done, cls = 'line', opts = {}) {
   let i = 1;
   const clsOf = typeof cls === 'function' ? cls : () => cls;
   const show = () => {
     // only the newest line fades in; earlier ones stay put
-    showOverlay(`<div class="card${i > 1 ? ' still' : ''}">${head || ''}${lines.slice(0, i).map((l, k) => `<div class="${clsOf(k)}${k < i - 1 ? ' prev' : ''}">${esc(l)}</div>`).join('')}</div><div class="tapmore">tap</div>`, {
+    showOverlay(`<div class="card${i > 1 ? ' still' : ''}">${head || ''}${lines.slice(0, i).map((l, k) => `<div class="${clsOf(k)}${k < i - 1 ? ' prev' : ''}">${esc(l)}</div>`).join('')}${opts.extra || ''}</div><div class="tapmore">${i < lines.length ? 'tap' : opts.foot || 'tap'}</div>`, {
       tap: () => { if (i < lines.length) { i++; show(); } else done(); },
     });
+    if (opts.mount) opts.mount();
   };
   show();
 }
 
 function showTitle() {
-  const cont = G.save.reached > 1;
+  const entry = entryLevel(G.save), cont = entry > 0;
   showOverlay(`<div class="card"><div class="titlewrap"><div class="halo"></div><div class="halo b"></div><div class="title">LIGHT LAG</div></div>
     <div class="sub">Everything you can see has already happened.</div>
     <div style="height:14px"></div>
-    <button class="bigbtn" id="tPlay">${cont ? `CONTINUE \u00b7 LEVEL ${Math.min(8, G.save.reached)}` : 'BEGIN'}</button>
+    <button class="bigbtn" id="tPlay">${cont ? `CONTINUE \u00b7 LEVEL ${entry}` : 'BEGIN'}</button>
     ${cont ? '<button class="ghostbtn" id="tLevels">Level select</button>' : ''}
     ${G.save.endingsFound.length ? `<div class="found">Endings found: ${G.save.endingsFound.length} of 3</div>` : ''}
     <div class="caption" style="margin-top:6px">Headphones help. About 30 minutes.</div></div>`);
-  $('tPlay').onclick = () => { AU.init(); startLevel(Math.min(8, G.save.reached)); };
-  const lv = $('tLevels'); if (lv) lv.onclick = () => { AU.init(); hideOverlay(); loadLevel(Math.min(8, G.save.reached)); openLevels(); };
+  $('tPlay').onclick = () => { AU.init(); startLevel(entry); };
+  const lv = $('tLevels'); if (lv) lv.onclick = () => { AU.init(); hideOverlay(); loadLevel(entry); openLevels(); };
 }
 function showOpening() {
   cards(TEXT.opening, () => { G.save.seenOpening = true; persist(); showTitle(); });
@@ -886,10 +996,20 @@ function startLevel(n) {
   loadLevel(n);
   const sc = SCRIPT[n];
   if (n === 1) { hideOverlay(); return; }
+  if (n === 0) { entryCard(); return; }
   const head = `<div class="kicker">${n === 8 ? 'Act III' : `Level ${n} \u00b7 Act ${actOf(n) === 1 ? 'I' : 'II'}`}</div><div class="ttl2">${esc(levelData(n).name)}</div>`;
   const lines = n === 8 ? [] : (sc.intro || []);
   if (!lines.length) { showOverlay(`<div class="card">${head}</div><div class="tapmore">tap to begin</div>`, { tap: () => { hideOverlay(); } }); return; }
   stack(head, lines, () => hideOverlay(), 'sub');
+}
+// L0's card can always be skipped straight to L1
+function entryCard() {
+  const head = `<div class="kicker">Tutorial</div><div class="ttl2">${esc(levelData(0).name)}</div>`;
+  stack(head, SCRIPT[0].intro, () => hideOverlay(), 'sub', {
+    foot: 'tap to begin',
+    extra: `<button class="ghostbtn quiet" id="l0Skip">${esc(L0.skip)}</button>`,
+    mount: () => { $('l0Skip').onclick = () => { AU.init(); G.save.l0Skipped = true; persist(); startLevel(1); }; },
+  });
 }
 
 // ---------- win + truth replay ----------
@@ -914,7 +1034,7 @@ function startReplay(host, opts) {
       const cs = getComputedStyle(ov), padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
       side = Math.min(maxW, ov.clientHeight - padV - opts.fit.scrollHeight - 2);
     }
-    side = Math.max(150, Math.floor(side));
+    side = Math.max(opts.min || 150, Math.floor(side));
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     cv.style.width = side + 'px'; cv.style.height = side + 'px'; cv.width = side * dpr; cv.height = side * dpr;
     c2.setTransform(dpr, 0, 0, dpr, 0, 0); g = makeGeom(side, side, R);
@@ -955,14 +1075,23 @@ function showWin() {
   const o = G.out, sc = SCRIPT[G.n];
   let end = sc.end;
   if (G.n === 1) end = `Confirmed. It happened ${WORDS[o.lag] || o.lag} year${o.lag === 1 ? '' : 's'} ago. You found out just now. This will keep happening.`;
-  showOverlay(`<div class="win"><div class="kicker">Level ${G.n} \u00b7 ${esc(G.L.name)}</div><div class="conf">Confirmed</div>
+  showOverlay(`<div class="win${G.n === 0 ? ' l0' : ''}"><div class="kicker">${G.n === 0 ? 'Tutorial' : `Level ${G.n}`} \u00b7 ${esc(G.L.name)}</div><div class="conf">Confirmed</div>
     <div class="when">It happened in year <b>${o.happened_at}</b>.<br>You found out in year <b>${o.confirmed_at_home}</b>.</div>
-    <div class="end">${esc(end)}</div>${replayHTML()}
+    ${G.n === 0 ? ledgerHTML() : ''}<div class="end">${esc(end)}</div>${replayHTML()}
     <div class="btnrow"><button id="wAgain">Play again</button><button class="go" id="wNext">${G.n === 7 ? 'Onward \u25B8' : 'Next \u25B8'}</button></div></div>`);
   const confirm = { at: o.confirmed_at_home, pts: o.req.filter((e) => SIM.seenTick(e) === o.confirmed_at_home).map((e) => e.pos) };
-  startReplay(ov.querySelector('.replay'), { level: G.L, res: G.res, end: o.confirmed_at_home, news: o.req, confirm, fit: ov.querySelector('.win'), showHidden: G.save.reached >= 5 && G.n >= 5 || G.save.reached >= 6 });
+  startReplay(ov.querySelector('.replay'), { level: G.L, res: G.res, end: o.confirmed_at_home, news: o.req, confirm, fit: ov.querySelector('.win'), min: G.n === 0 ? 120 : 150, showHidden: G.save.reached >= 5 && G.n >= 5 || G.save.reached >= 6 });
   $('wAgain').onclick = () => { hideOverlay(); loadLevel(G.n); };
   $('wNext').onclick = nextAfterWin;
+}
+// L0: the run's three delays, read off the run itself
+function ledgerHTML() {
+  const o = G.out, obj = G.L.objective;
+  const rx = G.res.events.filter((e) => e.type === 'order_rx' && e.data[0] === obj.drone && e.data[1] === 'MOVE' && e.t <= o.happened_at).pop();
+  if (!rx) return '';
+  const hexes = SIM.dist(rx.pos, obj.cell);
+  const rows = [[rx.t - rx.sent, SIM.ring(rx.pos)], [o.happened_at - rx.t, hexes], [o.confirmed_at_home - o.happened_at, SIM.ring(obj.cell)]];
+  return `<div class="ledger">${rows.map(([y, n], i) => `<div data-v="${y}"><span class="lk">${esc(L0.ledger[i][0])}</span><b>${y} yr${y === 1 ? '' : 's'}</b><span class="ln">${esc(L0.ledger[i][1].replace('{n}', n).replace('1 hexes', '1 hex'))}</span></div>`).join('')}</div>`;
 }
 // act cards: the first line is the act's title
 const actCard = (lines, done) => stack('', lines, done, (k) => (k === 0 ? 'ttl2' : 'line'));
@@ -981,7 +1110,7 @@ function showInterstitial(done) {
   G.save.reached = Math.max(G.save.reached, 5); persist();
   let i = 0;
   const boards = [2, 3, 4].map((n) => {
-    const L = LEVELS_JSON[n - 1];
+    const L = levelData(n);
     const ref = Object.entries(L.test_plans).find(([k]) => k.startsWith('reference'))[1];
     const plan = ref.map((x) => ({ t: x[0], kind: x[1], who: x[2], arg: x[3] }));
     const res = SIM.simulate(L, plan, 30);
@@ -1152,8 +1281,9 @@ G.L = levelData(1);
 requestAnimationFrame(() => {
   layout();
   if (!G.save.seenOpening) showOpening(); else showTitle();
-  loadLevel(Math.min(8, G.save.reached));
+  loadLevel(entryLevel(G.save));
   requestAnimationFrame(loop);
 });
 // test hook (no network, no data collection; used by the automated checks)
-window.__LL = { G, SIM, FIN, advance, rewindTo, loadLevel, startLevel, queueMove, queueFlash, select, onBoardTap, hideOverlay, untilNews, geomOf: () => geom };
+window.__LL = { G, SIM, FIN, advance, rewindTo, loadLevel, startLevel, queueMove, queueFlash, select, onBoardTap, hideOverlay, untilNews, geomOf: () => geom,
+  GD, entryLevel, guideTo, guideTap, guideAnswer, openLevels };

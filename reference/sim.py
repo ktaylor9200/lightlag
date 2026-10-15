@@ -241,6 +241,14 @@ def outcome(level, plan, T=80):
         if not e:
             return None, res
         req.append(e[0])
+    elif obj['type'] == 'reach':
+        # L0: the first year (>= 0) the named drone stands on the cell
+        h = res['hist'][('drone', obj['drone'])]
+        cell = tuple(obj['cell'])
+        ts = [t for t in sorted(h) if t >= 0 and h[t] == cell]
+        if not ts:
+            return None, res
+        req.append((ts[0], cell, 'reach', obj['drone']))
     elif obj['type'] == 'sign':
         for k, w in res['wat'].items():
             if w['kind'] in ('sign', 'precedent'):

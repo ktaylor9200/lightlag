@@ -21,6 +21,10 @@ const url = 'file://' + path.join(__dirname, '..', 'lightlag.html');
     const r = await B.eval(`(() => { const b = document.getElementById('tPlay').getBoundingClientRect(); return [b.x + b.width/2, b.y + b.height/2]; })()`);
     await B.tap(r[0], r[1]);
     await B.sleep(400);
+    // a new save starts at the L0 entry card: skip it to L1
+    const sk = await B.eval(`(() => { const b = document.getElementById('l0Skip').getBoundingClientRect(); return [b.x + b.width/2, b.y + b.height/2]; })()`);
+    await B.tap(sk[0], sk[1]);
+    await B.sleep(400);
     await B.shot(path.join(out, '03-L1.png'));
     // tutorial: tap drone A, tap D1's seen hex, transmit, wait
     const hexPx = (q, rr) => B.eval(`(() => { const g = __LL.geomOf(); const c = document.getElementById('board').getBoundingClientRect(); const p = g.px(${q}, ${rr}); return [c.x + p[0], c.y + p[1]]; })()`);

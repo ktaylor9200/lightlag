@@ -94,6 +94,17 @@
         "solve P,Q,R but miss the split": [[0, "FLASH", "X", "P"], [3, "FLASH", "Y", "Q"], [0, "FLASH", "Z", "R"]],
         "reference": [[0, "FLASH", "X", "P"], [3, "FLASH", "Y", "Q"], [0, "FLASH", "Z", "R"], [9, "PING", "HOME", "R2"]]
       }
+    },
+    {
+      "n": 0, "act": 0, "name": "First Light", "R": 3,
+      "drones": {"A": [1, -2]},
+      "objective": {"type": "reach", "drone": "A", "cell": [3, -2], "text": "Send A to the mark. Then find out."},
+      "test_plans": {
+        "no order": [],
+        "reference: send A at y0": [[0, "MOVE", "A", [3, -2]]],
+        "late order (y3)": [[3, "MOVE", "A", [3, -2]]],
+        "wrong hex, then the mark (y1)": [[0, "MOVE", "A", [2, -3]], [1, "MOVE", "A", [3, -2]]]
+      }
     }
   ]
 }

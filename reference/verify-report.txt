@@ -39,3 +39,9 @@
   naive: all three now                 -> None
   solve P,Q,R but miss the split       -> None
   reference                            -> {'confirmed_at_home': 15, 'happened_at': 12, 'lag': 3}
+======================================================================
+0 First Light
+  no order                             -> None
+  reference: send A at y0              -> {'confirmed_at_home': 9, 'happened_at': 6, 'lag': 3}
+  late order (y3)                      -> {'confirmed_at_home': 12, 'happened_at': 9, 'lag': 3}
+  wrong hex, then the mark (y1)        -> {'confirmed_at_home': 10, 'happened_at': 7, 'lag': 3}

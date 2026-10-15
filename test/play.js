@@ -5,6 +5,7 @@ const path = require('path');
 const { launch } = require('./cdp.js');
 const url = 'file://' + path.join(__dirname, '..', 'lightlag.html');
 const expect = {
+  0: { 'no order': null, 'reference: send A at y0': 9, 'late order (y3)': 12, 'wrong hex, then the mark (y1)': 10 },
   1: { 'naive: aim at what you see': null, 'naive, then corrected at y2': 9, 'reference: wait for projection': 11, 'second chance only (D2)': 25 },
   2: { 'naive: aim at what you see (y5)': null, reference: 16 },
   3: { 'naive: flash both now': null, reference: 10 },
@@ -18,7 +19,8 @@ const expect = {
   let fails = 0;
   const ok = (c, m) => { if (!c) fails++; console.log((c ? 'ok   ' : 'FAIL ') + m); };
   await B.goto(url);
-  await B.eval(`__LL.G.save.tutorialDone = true; __LL.hideOverlay(); 1`);
+  // noGuide: L0 plays as a free level, so its test plans run through the real game
+  await B.eval(`__LL.G.save.tutorialDone = true; __LL.G.noGuide = true; __LL.hideOverlay(); 1`);
   for (const [n, plans] of Object.entries(expect)) {
     for (const [label, want] of Object.entries(plans)) {
       const got = await B.eval(`(() => {

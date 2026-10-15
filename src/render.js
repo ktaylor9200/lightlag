@@ -50,6 +50,15 @@ function frontPath(ctx, g, c, r) {
   });
   ctx.closePath();
 }
+// light coming home or going out, as Home calculates it (L0): long bright dashes
+// in the Home colour, so it never reads as the fainter short-dashed order front
+function newsFront(ctx, g, c, r, a) {
+  frontPath(ctx, g, c, r);
+  ctx.save(); ctx.lineJoin = 'round';
+  ctx.setLineDash([]); ctx.strokeStyle = `rgba(255,243,214,${0.14 * a})`; ctx.lineWidth = 6; ctx.stroke();
+  ctx.setLineDash([9, 5]); ctx.strokeStyle = `rgba(255,243,214,${0.95 * a})`; ctx.lineWidth = 2.2; ctx.stroke();
+  ctx.restore();
+}
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
@@ -128,6 +137,8 @@ const SPOKES = [[-1, 1], [0, 1], [0, -1], [1, -1]];
 const spokeCache = new WeakMap();
 function ringSpoke(F) {
   const L = F.level;
+  const fixed = SCRIPT[L.n] && SCRIPT[L.n].spoke; // a UI-only override (L0)
+  if (fixed) return fixed;
   if (spokeCache.has(L)) return spokeCache.get(L);
   const occ = new Set(), add = (p) => { if (p) occ.add(p[0] + ',' + p[1]); };
   for (const key in F.res.hist) {
@@ -246,6 +257,20 @@ function render(ctx, g, F) {
     hexPath(ctx, x, y, s * 0.92); ctx.fillStyle = 'rgba(255,243,214,0.08)'; ctx.fill();
     ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.restore();
   }
+  // the mark (L0): a place on the map, not an object, so neither solid nor dashed
+  const mark = L.objective.type === 'reach' ? L.objective.cell : null;
+  if (mark) {
+    const [x, y] = g.px(mark[0], mark[1]), fs = Math.round(Math.max(8, Math.min(10, s * 0.34)));
+    ctx.save();
+    hexPath(ctx, x, y, s * 0.8); ctx.strokeStyle = 'rgba(255,243,214,0.8)'; ctx.lineWidth = 1.4; ctx.stroke();
+    hexPath(ctx, x, y, s * 0.66); ctx.strokeStyle = 'rgba(255,243,214,0.22)'; ctx.lineWidth = 1; ctx.stroke();
+    // the label sits just above the outline, clear of whatever stands on the mark
+    const ly = y - s * 0.8 - fs * 0.75;
+    ctx.font = `700 ${fs}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    haloText(ctx, 'MARK', x, ly, 'rgba(255,243,214,0.85)', 'rgba(5,10,23,0.85)', 3);
+    ctx.restore();
+    occ.push({ x: x - s * 0.6, y: ly - fs / 2 - 1, w: s * 1.2, h: fs + 2, wt: 6 });
+  }
 
   // ---------- fronts (clipped to the board) ----------
   let txFlash = 0;
@@ -266,6 +291,15 @@ function render(ctx, g, F) {
     ctx.setLineDash(seen ? [5, 5] : []); ctx.strokeStyle = `rgba(${rgb},${a})`; ctx.lineWidth = 1.6; ctx.stroke();
   }
   ctx.setLineDash([]);
+  // L0, seen mode: Home knows when its drone arrives, so it can calculate
+  // where the news of the arrival is on its way home (dashed, until it lands)
+  if (seen && mark) {
+    const h = F.res.hist['drone:' + L.objective.drone] || {};
+    let ta = null;
+    for (let y = 0; y <= F.now; y++) if (SIM.eq(h[y], mark)) { ta = y; break; }
+    const r = ta === null ? -1 : vf - ta, d = SIM.ring(mark);
+    if (r >= 0 && r < d) newsFront(ctx, g, mark, Math.max(0.3, r), 1);
+  }
   // true mode: the news of each objective event travelling home
   if (!seen && F.newsEvents) {
     for (const e of F.newsEvents) {

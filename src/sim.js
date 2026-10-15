@@ -225,6 +225,13 @@ const SIM = (() => {
     } else if (obj.type === 'rec') {
       const e = ev.find((x) => x.type === 'rec_on' && x.data === obj.id);
       if (!e) return null; req.push(e);
+    } else if (obj.type === 'reach') {
+      // L0: the first year (>= 0) the named drone stands on the cell
+      const h = res.hist['drone:' + obj.drone] || {};
+      let t = null;
+      for (let y = 0; y <= T; y++) if (h[y] && eq(h[y], obj.cell)) { t = y; break; }
+      if (t === null) return null;
+      req.push({ t, pos: obj.cell, type: 'reach', data: obj.drone });
     } else if (obj.type === 'sign') {
       for (const w of res.wat) {
         if (w.kind === 'sign' || w.kind === 'precedent') {

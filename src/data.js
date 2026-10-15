@@ -9,6 +9,14 @@ const FINALE_LEVEL = {
 };
 
 const SCRIPT = {
+  0: {
+    intro: ['Home is at the centre. Everything else is far away.', 'Light crosses one ring a year. So does every order you send.'],
+    end: 'Two hexes took nine years. Nothing went wrong. That is how far away everything is.',
+    hints: ['Tap A, then the outlined mark.', 'TRANSMIT once. Then WAIT, a year at a time, until the news comes home.'],
+    startLog: ['Drone A is two light-years out. The mark is three.'],
+    glints: [],
+    spoke: [0, -1], // ring-age labels on the NW spoke: the lower half belongs to the coach
+  },
   1: {
     intro: null,
     end: 'Confirmed. It happened two years ago. You found out just now. This will keep happening.',
@@ -62,6 +70,37 @@ const SCRIPT = {
     hints: [],
     startLog: [],
   },
+};
+
+// L0 "First Light": every line the guide says, in one place so it can be
+// trimmed to fit. Coach lines are [lead, text]; the lead may be null.
+const L0 = {
+  g1: ['Home.', "You're at the centre. Light, and every order you send, goes out one ring a year."],
+  g2: ['Old light.', 'Light from A takes two years to reach you, so you see A as it was two years ago.'],
+  g3: [null, 'Tap your drone, A.'],
+  g4: ['Solid means seen.', 'Tap the mark to send A there.'],
+  ask1: { q: 'Your order travels at light speed. When does A get it?', opts: [1, 2, 4], right: 2,
+    yes: 'Yes. Ring 2: two years. Now TRANSMIT.', no: 'Year 2. Ring 2 is two years out, for orders too. Now TRANSMIT.' },
+  years: {
+    1: ['Year 1.', 'The dashed ring is your order, crossing one ring a year. Tap WAIT.'],
+    2: ['Year 2.', 'The order reaches A. Delay one: two rings, two years.'],
+    3: ['Year 3.', 'A has its order. Each hex takes it two years: half light speed.'],
+    4: ['Year 4.', "Dashed A has moved: that's Home's calculation. Solid A is what Home sees, still two years old."],
+    5: ['Year 5.', "Home knows A is moving. It hasn't seen it move."],
+    6: ['Year 6.', 'A reaches the mark: two hexes, four years. Home is only now seeing it leave.'],
+    7: ['Year 7.', 'The dashed ring from the mark is the news, coming home a ring a year.'],
+    8: ['Year 8.', 'A has been there two years. Home still sees it on the way.'],
+  },
+  ask2: { q: 'A is there. When will Home see it?', opts: [6, 7, 9], right: 9,
+    yes: 'Yes. Ring 3: three years home. WAIT and watch it come.', no: 'Year 9. The news has three rings to cross. WAIT and watch it come.' },
+  toast: {
+    card: 'Tap the card to go on.', aim: 'Tap A: the gold triangle.', mark: "Tap the mark: the outlined hex two to A's right.",
+    pick: 'Pick a year first.', tx: 'Tap TRANSMIT.', wait: 'Tap WAIT ▸ to let a year pass.',
+  },
+  ago: '2 yrs ago',
+  skip: 'Skip to Level 1',
+  // the win screen's delay ledger: {n} is a ring or hex count from the run itself
+  ledger: [['Order out', 'light speed, ring {n}'], ['A flies', 'half light speed, {n} hexes'], ['News home', 'light speed, ring {n}']],
 };
 
 const TEXT = {
